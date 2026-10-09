@@ -15,6 +15,11 @@ import {
     retryAtomicRename,
     swapAtomicInodes,
     stageLibraryPayload,
+    writeSagaJournal,
+    rollbackSagaJournal,
+    finalizeSagaJournal,
+    getJournalPath,
+    type SagaJournal,
 } from '../995.library/00.library.unit/buz/library.buzz'
 
 const cleanEnv = () => {
@@ -843,4 +848,126 @@ test.serial('retryAtomicRename: successfully renames and handles transient retri
 
     t.false(await fs.pathExists(srcFile));
     t.true(await fs.pathExists(destFile));
+});
+
+test.serial('Phase 3 Journal: writes and flushes active saga state to data/saga/active.json', async (t) => {
+    const journalFile = getJournalPath();
+    const mockJournal: SagaJournal = {
+        sagaId: 'test-saga-001',
+        sourceDir: '/source',
+        status: 'RUNNING',
+        targetsCompleted: ['/target1'],
+        targetsFailed: [],
+        backups: { '/target1': '/backup1' },
+        records: {
+            '/target1': { targetDir: '/target1', state: 'COMPLETED' },
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+
+    t.teardown(async () => {
+        await fs.remove(path.dirname(journalFile)).catch(() => {});
+    });
+
+    await writeSagaJournal(mockJournal);
+
+    t.true(await fs.pathExists(journalFile));
+    const loaded = await fs.readJson(journalFile);
+    t.is(loaded.sagaId, 'test-saga-001');
+    t.is(loaded.status, 'RUNNING');
+});
+
+test.serial('Phase 3 Compensation: reverses multi-target fleet mutations in reverse chronological order', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_compensation_fleet_test');
+    const parentA = path.join(sandboxDir, 'repoA', 'apps');
+    const parentB = path.join(sandboxDir, 'repoB', 'apps');
+    const targetA = path.join(parentA, '995.library');
+    const targetB = path.join(parentB, '995.library');
+    const backupA = path.join(parentA, '.tmp_backup_A');
+    const backupB = path.join(parentB, '.tmp_backup_B');
+
+    await fs.ensureDir(targetA);
+    await fs.ensureDir(targetB);
+    await fs.ensureDir(parentA);
+    await fs.ensureDir(parentB);
+    await fs.ensureDir(backupA);
+    await fs.ensureDir(backupB);
+
+    // Initial files
+    await fs.writeFile(path.join(backupA, 'version.txt'), 'ORIGINAL_A');
+    await fs.writeFile(path.join(targetA, 'version.txt'), 'MUTATED_A');
+
+    await fs.writeFile(path.join(backupB, 'version.txt'), 'ORIGINAL_B');
+    await fs.writeFile(path.join(targetB, 'version.txt'), 'MUTATED_B');
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {});
+        await fs.remove(path.dirname(getJournalPath())).catch(() => {});
+    });
+
+    const mockJournal: SagaJournal = {
+        sagaId: 'test-fleet-rollback',
+        sourceDir: '/source',
+        status: 'RUNNING',
+        targetsCompleted: [targetA, targetB],
+        targetsFailed: ['/targetC'],
+        backups: {
+            [targetA]: backupA,
+            [targetB]: backupB,
+        },
+        records: {
+            [targetA]: { targetDir: targetA, state: 'COMPLETED' },
+            [targetB]: { targetDir: targetB, state: 'COMPLETED' },
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+
+    const outcome = await rollbackSagaJournal(mockJournal);
+
+    t.true(outcome.compensated);
+    t.is(outcome.unrecoverableErrors.length, 0);
+
+    // Assert both targets reverted to pristine backup state
+    t.is(await fs.readFile(path.join(targetA, 'version.txt'), 'utf8'), 'ORIGINAL_A');
+    t.is(await fs.readFile(path.join(targetB, 'version.txt'), 'utf8'), 'ORIGINAL_B');
+
+    // Assert backups consumed and unlinked
+    t.false(await fs.pathExists(backupA));
+    t.false(await fs.pathExists(backupB));
+
+    // Assert journal recorded COMPENSATED status
+    t.is(mockJournal.status, 'COMPENSATED');
+});
+
+test.serial('Phase 3 Finalize: sweeps lingering backups and unlinks active journal file on success', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_finalize_test');
+    const backupDir = path.join(sandboxDir, '.tmp_backup_clean');
+    const journalFile = getJournalPath();
+
+    await fs.ensureDir(backupDir);
+    await fs.writeFile(path.join(backupDir, 'dummy.txt'), 'old');
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {});
+        await fs.remove(path.dirname(journalFile)).catch(() => {});
+    });
+
+    const mockJournal: SagaJournal = {
+        sagaId: 'test-finalize',
+        sourceDir: '/source',
+        status: 'RUNNING',
+        targetsCompleted: ['/target'],
+        targetsFailed: [],
+        backups: { '/target': backupDir },
+        records: { '/target': { targetDir: '/target', state: 'COMPLETED' } },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
+
+    await finalizeSagaJournal(mockJournal);
+
+    t.false(await fs.pathExists(backupDir));
+    t.false(await fs.pathExists(journalFile));
 });
