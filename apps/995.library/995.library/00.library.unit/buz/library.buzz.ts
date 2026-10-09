@@ -1657,3 +1657,13 @@ export const progressLibrarySaga = async (
     return cpy;
 
 }
+export const auditLibrary = (
+    cpy: LibraryModel,
+    bal: LibraryBit,
+    ste: State,
+) => {
+    if (bal && bal.slv != null) {
+        bal.slv({ libBit: { idx: 'audit-library', dat: null, val: 0 } })
+    }
+    return cpy
+}
