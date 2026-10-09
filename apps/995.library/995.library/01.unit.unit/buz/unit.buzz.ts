@@ -506,7 +506,7 @@ export const updateUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
     }
 
     const rootUpper = root.charAt(0).toUpperCase() + root.slice(1)
-    const nom = bal.dat
+    const nom = typeof bal.dat === 'string' ? bal.dat : 'action'
     const nomUpper = nom.charAt(0).toUpperCase() + nom.slice(1)
 
     if (ste) {
