@@ -1026,14 +1026,12 @@ export const scanFleet = async (
                 const appTarget = path.join(repoPath, 'apps', targetPivot)
 
                 if (fs.existsSync(pkgTarget)) {
-                    const rel = path
-                        .relative(fleetRoot, pkgTarget)
+                    const rel = path.relative(fleetRoot, pkgTarget)
                         .replace(/\\/g, '/')
                         .replace(/^\/+/, '')
                     fleetMap.push(`[${rel}]`)
                 } else if (fs.existsSync(appTarget)) {
-                    const rel = path
-                        .relative(fleetRoot, appTarget)
+                    const rel = path.relative(fleetRoot, appTarget)
                         .replace(/\\/g, '/')
                         .replace(/^\/+/, '')
                     fleetMap.push(`[${rel}]`)
@@ -1042,8 +1040,7 @@ export const scanFleet = async (
                 // Default: Discover repositories hosting the apps/995.library flight deck
                 const harnessTarget = path.join(repoPath, 'apps', '995.library')
                 if (fs.existsSync(harnessTarget)) {
-                    const rel = path
-                        .relative(fleetRoot, harnessTarget)
+                    const rel = path.relative(fleetRoot, harnessTarget)
                         .replace(/\\/g, '/')
                         .replace(/^\/+/, '')
                     fleetMap.push(`[${rel}]`)
