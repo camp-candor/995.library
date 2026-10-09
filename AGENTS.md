@@ -1,115 +1,274 @@
-# AGENTS.md -- Workspace Architecture & Operational Guidelines
+# AGENTS.md -- Master Storehouse Architecture & Fleet Operational Guidelines
 
 > Operational manual, monorepo architecture, invariant specifications, and
-> coding standards for the `955.library` ecosystem.
+> coding standards for the `995.library` ecosystem.
 >
-> `955.library` provides a deterministic Blessed terminal cockpit with a
-> Redux-pattern state engine. Downstream packages are mounted dynamically, and
-> all additions must stay generic, identity-agnostic, and template-safe.
+> `995.library` is the definitive master storehouse and point of origin for all
+> domain units, state machines, and Blessed terminal cockpits across the fleet.
+> Downstream monorepos inherit pivots and harnesses from this repository.
 
 ---
 
-## 0. Agent Onboarding -- Read This First
+## 0. Day 000 Orientation & Master Storehouse Mission
 
-Before writing code, orient yourself in this order:
+`995.library` operates under a dual architectural mandate:
 
-1. **This file** -- laws, boundaries, and the verification gauntlet.
-2. **`data/overview/`** -- architectural intent and design rationale.
-3. **`data/building/`** -- chronological session transcripts.
-4. **`data/directive/`** -- task specifications and audit dossiers.
-5. **The code** -- verify claims against live source before relying on them.
+1. **The Definitive Point of Origin:** All reusable units (`*.unit`), action
+   bale definitions, buzzers, and Redux-pattern state machines across the entire
+   fleet originate, evolve, and are verified in this repository.
+2. **The Autonomous Terminal Cockpit:** A deterministic Blessed terminal UI
+   harness backed by an `rx-lite` state machine, capable of mounting local
+   domain pivots dynamically without compile-time coupling.
 
----
+Before implementing features or modifying code, orient yourself in this order:
 
-## 1. Core Directives & Immutability Boundaries
-
-- **System:** Standard NPM Monorepo (`workspaces: ["packages/*", "apps/*"]`). Do
-  NOT introduce Nx, Lerna, Yarn, or PNPM.
-- **Privacy:** Private repository (`"private": true`). Do NOT publish packages
-  to public npm registries.
-- **Git Commits:** Use standard conventional commit format:
-  `git commit -m "type: description"` (`feat`, `fix`, `chore`, `refactor`,
-  `test`, `docs`, `ci`).
-- **TypeScript Integrity:** Strict mode is enforced (`strict: true`, pure ESM
-  exports). Never emit compiled `.js` or `.d.ts` files side-by-side into `src/`
-  directories.
-- **Cross-Platform Scripts:** `package.json` scripts must run identically on
-  Windows and POSIX. Prefer `node -e` one-liners over raw shell built-ins.
-- **Template Generalization Law:** Never hardcode repository identity (e.g.
-  `"REPO-BOT"`, `"NPM-AGENT-01"`). Derive names/versions dynamically via
-  `packages/000.agent/src/identity.ts` (`getRepoIdentity`).
-- **HARNESS IMMUTABILITY BOUNDARY (`apps/995.library`):**
-  `apps/995.library/995.library/**` is the canonical upstream terminal harness
-  and is **STRICTLY IMMUTABLE**. Never add, modify, or delete models, reducers,
-  actions, buzzers, or UI components inside `apps/995.library/995.library/`.
-  `apps/995.library/run.ts` is the **only permitted modification path**.
-- **Fail-Safe Exit:** If compilation, types, lint, tests, or boundary checks
-  fail, halt and emit `CONFLICT_BLOCKED` with diagnostic traces.
+1. **This file (`AGENTS.md`)** -- Core laws, boundaries, and quality gauntlets.
+2. **`apps/995.library/run.ts`** -- Schema-driven runner and dynamic bus
+   injector.
+3. **`apps/995.library/995.library/00.library.unit/`** -- Workspace template
+   compiler.
+4. **`packages/`** -- Canonical storehouse for modular fleet domain pivots.
+5. **`data/`** -- Task specifications, audit dossiers, and runtime artifacts.
 
 ---
 
-## 2. Monorepo Architecture & Workspace Roles
+## 1. Core Invariants & Architectural Laws (CRITICAL FOR CODING AGENTS)
+
+Coding agents operating in this repository MUST strictly adhere to the following
+laws:
+
+### Law 1: Local Harness Mutability (Lifted Immutability Boundary)
+
+- For downstream consumer repositories, `apps/995.library/995.library/**` is a
+  vendor harness that remains immutable.
+- **FOR THIS REPOSITORY ONLY**, the immutability boundary on
+  `apps/995.library/995.library/` is **PERMANENTLY LIFTED**.
+- Active development on the library, its core curses widgets, state engine, and
+  built-in units occurs directly inside `apps/995.library/995.library/`.
+
+### Law 2: Structural Monorepo Parity (The Copy-Paste Invariant)
+
+- All domain units must maintain a strict 1:1 structural parity with downstream
+  repositories.
+- Domain units are organized into discrete workspaces under `packages/<domain>/`
+  (e.g., `packages/000.agent`, `packages/103.factory`).
+- **Do NOT collapse packages into `apps/995.library/`**. Keeping physical folder
+  boundaries isolated ensures that any pivot package or the library itself can
+  be copied and pasted directly into any other monorepo across the fleet without
+  path or build adjustments.
+
+### Law 3: 7-Bit Pure ASCII Compliance (ABSOLUTE REQUIREMENT)
+
+- All terminal labels, curses HUD widgets, console telemetry, status tokens, and
+  log messages must use **7-bit pure ASCII** (`>>`, `[OK]`, `[FAIL]`,
+  `[UPDATE]`, `::`, `---`).
+- **Multi-byte UTF-8 emojis are strictly prohibited.** Do not use them in logs,
+  UI code, or documentation to prevent character buffer corruption in Windows
+  `cmd.exe` and standard curses terminal emulators.
+
+### Law 4: Fail-Closed Circuit Breaker & Negative Controls
+
+- Metaprogramming compilers, scaffolding engines, and dynamic loaders must catch
+  runtime and filesystem errors cleanly.
+- On error, buzzers must emit a structured ASCII alert (`>> [RE-WIRE ERROR]`) to
+  console `cns00` and resolve error bales (e.g., `update-library-err`) rather
+  than throwing unhandled exceptions that tear down the Blessed curses process.
+- A component that has not been empirically verified against negative controls
+  (missing directories, syntax faults, malformed manifests) is not
+  production-ready.
+
+---
+
+## 2. Monorepo Topology & Workspace Roles
 
 ```text
 .
 ├── apps/
 │   └── 995.library/            # Blessed Terminal UI Harness (@camp_candor/995.library)
-│       ├── run.ts              # Dynamic package loader & CLI entrypoint (ONLY mutable file)
-│       └── 995.library/        # [IMMUTABLE] Core Blessed Curses engine
+│       ├── run.ts              # Schema-driven dynamic runner & bus injector
+│       ├── package.json        # Harness runtime dependencies
+│       ├── data/redux/BEE.txt  # Canonical Redux wiring manifest template
+│       ├── test/               # AVA test suites for harness and compilers
+│       └── 995.library/        # [MUTABLE IN THIS REPO] Core Curses engine & units
+│           ├── BEE.ts          # Root library state manifest
+│           ├── hunt.ts         # Library execution harness & dispatcher
+│           ├── 00.library.unit/# Metaprogramming & workspace compiler buzzers
+│           ├── 01.unit.unit/   # Deterministic unit scaffolding engine
+│           ├── 80.terminal.unit# Blessed curses screen container
+│           ├── 83.console.unit # Console log viewport (cns00)
+│           ├── 85.choice.unit/ # Interactive menu choice form
+│           └── 98.menu.unit/   # Master terminal navigation loop
 │
-├── packages/
-│   └── 000.agent/              # Core Agent Domain & Terminal Cockpit (@camp_candor/000.agent)
-│       ├── BEE.ts              # Unit registration & state manifest
-│       ├── src/cascade.ts      # Endpoint resolution cascade
-│       ├── src/identity.ts     # Dynamic repo identity
-│       ├── 00.agent.unit/      # Agent core actions, reducers, and tests
-│       └── 98.menu.unit/       # Blessed Menu Screen
+├── packages/                   # Canonical Storehouse for Fleet Domain Pivots
+│   ├── 000.agent/              # Core Agent Domain & Cockpit (@camp_candor/000.agent)
+│   │   ├── BEE.ts              # Agent unit wiring manifest
+│   │   ├── hunt.ts             # Standardized state machine bootstrap contract
+│   │   ├── package.json        # Contains "terminal" schema metadata
+│   │   ├── 00.agent.unit/      # Agent domain actions and buzzers
+│   │   └── 98.menu.unit/       # Agent cockpit sub-menu
+│   └── <domain>/               # Additional modular fleet packages
 │
-└── data/                       # Historical record & generated artifacts
-    ├── overview/               # Architectural intent
-    ├── building/               # Session build logs
-    ├── directive/              # Executed directives and audits
-    ├── flat/                   # [GENERATED] Flattened library snapshots
-    └── unit/                   # [GENERATED] Scaffolded unit templates
+└── data/                       # Historical transcripts & build directives
+    ├── flat/                   # Flattened repository snapshots
+    ├── unit/                   # Scaffolded unit artifacts
+    └── directive/              # Task specifications and audit dossiers
 ```
 
 ---
 
-## 3. Terminal Standards
+## 3. Metaprogramming & Workspace-Aware Compilers (`updateLibrary`)
 
-- **7-Bit Pure ASCII Compliance:** All terminal labels, console messages, and
-  log tokens must use ASCII characters (`>>`, `[OK]`, `[FAIL]`, `[ONLINE]`,
-  `::`). Unicode emojis are prohibited to prevent character corruption in
-  terminal emulators.
-- **Dynamic Mounting:** Packages in `packages/` that export a valid unit
-  structure are auto-discovered by `apps/995.library/run.ts` and registered into
-  the Blessed menu.
+The `UPDATE_LIBRARY` action (`00.library.unit/buz/library.buzz.ts`) is the
+in-process metaprogramming engine of the fleet. It allows dynamic regeneration
+of Redux coordination manifests without restarting terminal sessions.
+
+### Execution Lifecycle
+
+1. **Target Directory Resolution:** Resolves `bal.src` dynamically across the
+   monorepo root, supporting absolute paths, relative paths, and workspace slugs
+   (e.g., `packages/000.agent` or `[packages/103.factory]`).
+2. **Lexical Unit Sweeping:** Scans the resolved directory strictly for entries
+   matching `/^\d{2}\..+\.unit$/`. Discovered units are sorted lexicographically
+   (`a.localeCompare(b)`) to guarantee deterministic, bit-reproducible output.
+3. **Template Resolution & Fallback:** Reads `BEE.txt` from the target workspace
+   or `apps/995.library/data/redux/BEE.txt`. If absent, falls back to a built-in
+   in-memory template string.
+4. **AST Token Interpolation:** Dissects unit directory names into numerical
+   indices, raw domain verbs, and PascalCase identifiers to generate:
+   - Class imports (`import FooUnit from "./00.foo.unit/foo.unit";`)
+   - Interface and Model imports
+     (`import { FooModel } from "./00.foo.unit/foo.model";`)
+   - Reducer slice imports
+     (`import * as reduceFromFoo from "./00.foo.unit/foo.reduce";`)
+   - Composite `list`, `reducer`, and `UnitData` class declarations.
+5. **Scoped Emission:** Synchronously writes the assembled AST directly to
+   `<targetDir>/BEE.ts`. It never touches `apps/995.library/995.library/BEE.ts`
+   unless that workspace is explicitly targeted.
 
 ---
 
-## 4. Verification Gauntlet & Quality Gates
+## 4. Schema-Driven Dynamic Autodiscovery & Bus Bootstrapping (`run.ts`)
 
-Execute the verification gauntlet before pushing code or opening PRs:
+`apps/995.library/run.ts` operates as a zero-configuration dynamic runner.
+Hardcoded package registries (such as `PACKAGES_CONFIG`) are prohibited.
+
+### Autodiscovery Protocol
+
+1. **Filesystem Sweep:** `run.ts` inspects `packages/*` for directories
+   containing a valid `tsconfig.json`.
+2. **Schema Ingestion:** Reads `package.json` for each package and looks for the
+   `terminal` metadata block:
+   ```json
+   {
+     "terminal": {
+       "globalKey": "AGENT",
+       "menuTitle": "AGENT MENU",
+       "menuDesc": "Open the Agent Cockpit menu\nto run system diagnostics."
+     }
+   }
+   ```
+3. **Heuristic Fallback:** If `terminal` metadata is omitted, `run.ts` extracts
+   the domain verb from the directory name (e.g., `103.factory` -> `factory`)
+   and derives `globalKey: "FACTORY"` and `menuTitle: "FACTORY MENU"`.
+4. **In-Memory Cross-Bus Wiring:**
+   - Dynamically loads `<package>/hunt.js` or `<package>/hunt.ts`.
+   - Injects the dispatcher onto the global scope:
+     `global[pkg.globalKey] = instance`.
+   - Populates the central pivot registry: `global.PIVOTS[pkg.name] = instance`
+     and `global.PIVOTS[pkg.globalKey] = instance`.
+5. **Headless & UI Pivot Handling:**
+   - If `98.menu.unit/menu.action` is detected, `run.ts` mounts the package into
+     the root Blessed navigation choice list via `ROUTE_MENU`.
+   - If no menu unit exists, it mounts the package as a headless background
+     service without throwing missing-route exceptions.
+
+---
+
+## 5. Scaffolding Standards & Non-Blocking Execution (`01.unit.unit`)
+
+All unit scaffolding generated by `createUnit` and `updateUnit` must adhere to
+deterministic execution standards:
+
+### Scaffolding Invariants
+
+- **Zero Artificial Delays:** Scaffolding buzzers must never use `setTimeout`
+  delays (e.g., `setTimeout(..., 2111)`). Promises must resolve immediately and
+  deterministically upon filesystem I/O completion.
+- **Non-Blocking Observable Stubs:** Newly scaffolded action handlers in
+  `unit.model.ts` (`buzzTemplate`) must never generate `debugger; return cpy;`
+  placeholders.
+- **Standardized Stub Contract:** Generated buzzers must export an asynchronous
+  handler that emits an execution ping to console `cns00` and immediately
+  resolves `bal.slv`:
+
+```typescript
+export const {{=it.buzNom}} = async (
+    cpy: {{=it.cpyNom}},
+    bal: {{=it.balNom}},
+    ste: State,
+) => {
+    if (ste) {
+        await ste.hunt('[Console action] Update Console', {
+            idx: 'cns00',
+            src: '>> Executing {{=it.buzNom}} stub',
+        });
+    }
+    if (bal && bal.slv != null) {
+        bal.slv({ {{=it.nom}}Bit: { idx: '{{=it.buzNom}}-stub' } });
+    }
+    return cpy;
+};
+```
+
+---
+
+## 6. Verification Gauntlet & Quality Gates
+
+Every code modification must pass the verification gauntlet before committing:
 
 ```bash
-# 1. Typecheck all project references
+# 1. Typecheck all project references across monorepo workspaces
 npm run check:types
 
-# 2. Run full monorepo sequential test battery (agent -> library)
+# 2. Assert 7-Bit Pure ASCII Compliance across all source files
+npm run check:sentry
+
+# 3. Assert zero compiled artifacts (.js, .d.ts) leaked into TypeScript source roots
+npm run check:artifacts
+
+# 4. Run monorepo unit test suites (AVA for library, Vitest for packages)
 npm test
 
-# 3. Assert Immutable Boundary Integrity (Must return 0 lines)
-npm run check:boundary
-
-# 4. Verify Unified Code Quality (types + prettier + eslint)
+# 5. Execute unified verification gate (types + lint + format + boundary)
 npm run check:all
 ```
 
 ### Quick Reference -- Common Scripts
 
-| Script                 | Purpose                             |
-| ---------------------- | ----------------------------------- |
-| `npm run tui`          | Launch the Blessed terminal cockpit |
-| `npm run test:agent`   | `000.agent` vitest suites           |
-| `npm run test:library` | `995.library` AVA suites            |
-| `npm run fix`          | Auto-fix prettier + eslint          |
+| Script                 | Purpose                                                |
+| ---------------------- | ------------------------------------------------------ |
+| `npm run tui`          | Launch Blessed curses cockpit via dynamic `run.ts`     |
+| `npm run test:library` | Run `apps/995.library` AVA test battery                |
+| `npm run test:agent`   | Run `packages/000.agent` Vitest suites                 |
+| `npm run check:types`  | Project-wide static TypeScript typechecking (`tsc -b`) |
+| `npm run fix`          | Auto-format with Prettier and apply ESLint fixes       |
+
+---
+
+## 7. Guide for AI Coding Agents
+
+If you are an AI agent modifying this codebase, **READ THIS SECTION CAREFULLY**:
+
+1. **Do Not Touch Downstream Concepts**: You are in the core `995.library`
+   repository. You CAN mutate `apps/995.library/995.library/**`. Do not behave
+   as if this is a downstream repository where this is locked.
+2. **Observe 7-Bit ASCII Strictly**: Do NOT output emojis in your commits, file
+   outputs, comments, or terminal outputs.
+3. **Always Run Checks**: Run `npm run check:all` before concluding your task.
+   Ensure there are no type errors, no lint issues, and that all tests pass.
+4. **Creating New Units**: When asked to create a new module, ALWAYS scaffold it
+   following the exact folder conventions:
+   `packages/<domain_name>/<unit_index>.<unit_name>.unit/`. You should invoke
+   the existing `01.unit.unit` or manually adhere to the deterministic stubs.
+5. **No `setTimeout` or `debugger`**: Your code should be fully non-blocking and
+   observable. Emits to the console (`cns00`) are your logging mechanism.

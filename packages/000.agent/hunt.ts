@@ -1,20 +1,19 @@
-var sim = {
+import State from './99.core/state.js'
+import * as Import from './BEE.js'
+
+var sim: any = {
     hunt: null,
     state: null,
 }
 
-sim.hunt = (typ, obj) => {
-    return host(obj, typ)
-}
-
-var host = (obj, typ) => {
+var host = (obj: any, typ: string) => {
     init()
 
-    var slv
-    const promo = new Promise((rslv, rjct) => (slv = rslv))
+    var slv: (val?: any) => void
+    const promo = new Promise((rslv) => (slv = rslv))
 
     if (obj == null) obj = {}
-    if (obj.slv == null) obj.slv = (val0) => slv(val0)
+    if (obj.slv == null) obj.slv = (val0: any) => slv(val0)
 
     sim.state.dispatch({ type: typ, bale: obj })
     return promo
@@ -28,7 +27,8 @@ var init = () => {
     for (var k in Import.list) new Import.list[k](sim.state)
 }
 
-import * as Import from './BEE.js'
-import State from './99.core/state.js'
+sim.hunt = (typ: string, obj?: any) => {
+    return host(obj, typ)
+}
 
 export default sim
