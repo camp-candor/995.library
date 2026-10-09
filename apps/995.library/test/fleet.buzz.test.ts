@@ -11,6 +11,8 @@ import {
     checkGitWorkingTree,
     resolveGitRoot,
     progressLibrarySaga,
+    filterZeroTrust,
+    stageLibraryPayload,
 } from '../995.library/00.library.unit/buz/library.buzz'
 
 const cleanEnv = () => {
@@ -619,3 +621,121 @@ test.serial('progressLibrarySaga: aborts before staging when target tree is dirt
     const preservedContent = await fs.readFile(dirtyFile, 'utf8')
     t.is(preservedContent, '// Important unsaved work')
 })
+
+
+test.serial('Phase 1 Filter: rejects secrets, VCS folders, and build caches', (t) => {
+    t.false(filterZeroTrust('/path/to/.env'));
+    t.false(filterZeroTrust('/path/to/.env.local'));
+    t.false(filterZeroTrust('/path/to/.env.production'));
+    t.false(filterZeroTrust('/path/to/.dev.vars'));
+    t.false(filterZeroTrust('/path/to/.git'));
+    t.false(filterZeroTrust('/path/to/.github'));
+    t.false(filterZeroTrust('/path/to/node_modules'));
+    t.false(filterZeroTrust('/path/to/dist'));
+    t.false(filterZeroTrust('/path/to/coverage'));
+    t.false(filterZeroTrust('/path/to/.wrangler'));
+    t.false(filterZeroTrust('/path/to/tsconfig.tsbuildinfo'));
+    t.false(filterZeroTrust('/path/to/server.key'));
+    t.false(filterZeroTrust('/path/to/cert.pem'));
+    t.false(filterZeroTrust('/path/to/service-account-creds.json'));
+
+    t.true(filterZeroTrust('/path/to/run.ts'));
+    t.true(filterZeroTrust('/path/to/package.json'));
+    t.true(filterZeroTrust('/path/to/00.library.unit/library.buzz.ts'));
+});
+
+test.serial('Phase 1 Staging: creates sibling staging folder on identical mount partition', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_staging_test');
+    const mockSource = path.join(sandboxDir, 'source_lib');
+    const mockTarget = path.join(sandboxDir, 'downstream', 'apps', '995.library');
+
+    await fs.ensureDir(mockSource);
+    await fs.ensureDir(path.dirname(mockTarget));
+    await fs.writeFile(path.join(mockSource, 'index.ts'), '// clean code');
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {});
+    });
+
+    const { stagingDir, parentDir } = await stageLibraryPayload(mockSource, mockTarget);
+
+    t.is(parentDir, path.dirname(mockTarget));
+    t.true(stagingDir.startsWith(parentDir));
+    t.true(await fs.pathExists(stagingDir));
+    t.true(await fs.pathExists(path.join(stagingDir, 'index.ts')));
+
+    await fs.remove(stagingDir);
+});
+
+test.serial('Phase 1 Staging: applies zero-trust filter and resolves symlinks', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_zero_trust_test');
+    const mockSource = path.join(sandboxDir, 'source_lib');
+    const mockTarget = path.join(sandboxDir, 'downstream', 'apps', '995.library');
+    const externalSymlinkTarget = path.join(sandboxDir, 'external_file.txt');
+
+    await fs.ensureDir(mockSource);
+    await fs.ensureDir(path.dirname(mockTarget));
+
+    // Valid files
+    await fs.writeFile(path.join(mockSource, 'valid.ts'), 'export const a = 1;');
+    await fs.writeFile(externalSymlinkTarget, 'external payload');
+    await fs.symlink(externalSymlinkTarget, path.join(mockSource, 'symlink.txt'));
+
+    // Blacklisted items
+    await fs.writeFile(path.join(mockSource, '.env'), 'SECRET=123');
+    await fs.writeFile(path.join(mockSource, '.env.production'), 'SECRET=456');
+    await fs.ensureDir(path.join(mockSource, 'node_modules'));
+    await fs.writeFile(path.join(mockSource, 'node_modules', 'dummy.js'), 'bad');
+    await fs.ensureDir(path.join(mockSource, '.git'));
+    await fs.writeFile(path.join(mockSource, '.git', 'HEAD'), 'ref: main');
+    await fs.writeFile(path.join(mockSource, 'bundle.tsbuildinfo'), 'cache');
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {});
+    });
+
+    const { stagingDir } = await stageLibraryPayload(mockSource, mockTarget);
+
+    // Assert valid files copied
+    t.true(await fs.pathExists(path.join(stagingDir, 'valid.ts')));
+
+    // Assert symlink dereferenced to physical file
+    t.true(await fs.pathExists(path.join(stagingDir, 'symlink.txt')));
+    const symlinkStat = await fs.lstat(path.join(stagingDir, 'symlink.txt'));
+    t.false(symlinkStat.isSymbolicLink(), 'Staged symlink must be dereferenced into a regular file');
+    t.is(await fs.readFile(path.join(stagingDir, 'symlink.txt'), 'utf8'), 'external payload');
+
+    // Assert blacklisted files excluded
+    t.false(await fs.pathExists(path.join(stagingDir, '.env')));
+    t.false(await fs.pathExists(path.join(stagingDir, '.env.production')));
+    t.false(await fs.pathExists(path.join(stagingDir, 'node_modules')));
+    t.false(await fs.pathExists(path.join(stagingDir, '.git')));
+    t.false(await fs.pathExists(path.join(stagingDir, 'bundle.tsbuildinfo')));
+
+    await fs.remove(stagingDir);
+});
+
+test.serial('Phase 1 Staging: cleans up partial staging directory on copy failure', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_staging_fail_test');
+    const mockTarget = path.join(sandboxDir, 'downstream', 'apps', '995.library');
+    const nonExistentSource = path.join(sandboxDir, 'ghost_source');
+
+    await fs.ensureDir(path.dirname(mockTarget));
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {});
+    });
+
+    await t.throwsAsync(
+        async () => {
+            await stageLibraryPayload(nonExistentSource, mockTarget);
+        },
+        { message: /STAGING_FAILED/ },
+    );
+
+    const parentDir = path.dirname(mockTarget);
+    const entries = await fs.readdir(parentDir);
+    const orphanedStaging = entries.filter((e) => e.startsWith('.tmp_staging_995_library_'));
+
+    t.is(orphanedStaging.length, 0, 'No orphaned staging folders should remain after a staging error');
+});
