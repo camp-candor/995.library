@@ -801,6 +801,348 @@ export const flatLibrary = async (
  * Evaluates explicit environment overrides, sentinel lockfiles, and organization markers
  * while defending against CI runner traps and filesystem escape loops.
  */
+export interface GitTreeStatus {
+    clean: boolean
+    repoRoot: string
+    dirtyFiles: {
+        indexStatus: string
+        workTreeStatus: string
+        filePath: string
+        origPath?: string
+    }[]
+    intersectingFiles: string[]
+}
+
+export const resolveGitRoot = async (targetDir: string): Promise<string | null> => {
+    const { execFile } = require('child_process')
+    const { promisify } = require('util')
+    const execFileAsync = promisify(execFile)
+    const path = require('path')
+    const fs = require('fs-extra')
+
+    try {
+        const { stdout } = await execFileAsync('git', ['rev-parse', '--show-toplevel'], {
+            cwd: targetDir,
+        })
+        return path.resolve(stdout.trim())
+    } catch {
+        let curr = path.resolve(targetDir)
+        while (curr && curr !== path.dirname(curr)) {
+            if (fs.existsSync(path.join(curr, '.git'))) {
+                return curr
+            }
+            const parent = path.dirname(curr)
+            if (parent === curr) break
+            curr = parent
+        }
+        return null
+    }
+}
+
+export const checkGitWorkingTree = async (targetDir: string): Promise<GitTreeStatus> => {
+    const { execFile } = require('child_process')
+    const { promisify } = require('util')
+    const execFileAsync = promisify(execFile)
+    const path = require('path')
+
+    const repoRoot = await resolveGitRoot(targetDir)
+
+    if (!repoRoot) {
+        return { clean: true, repoRoot: targetDir, dirtyFiles: [], intersectingFiles: [] }
+    }
+
+    let stdout = ''
+    try {
+        const res = await execFileAsync('git', ['status', '--porcelain=v1', '-uall'], {
+            cwd: repoRoot,
+        })
+        stdout = res.stdout
+    } catch {
+        return { clean: true, repoRoot, dirtyFiles: [], intersectingFiles: [] }
+    }
+
+    const relTarget = path.relative(repoRoot, targetDir).replace(/\\/g, '/')
+    const targetPrefix = relTarget.endsWith('/') ? relTarget : `${relTarget}/`
+
+    const dirtyFiles: GitTreeStatus['dirtyFiles'] = [];
+    const intersectingFiles: string[] = []
+
+    const lines = stdout.split('\n').filter((line: string) => line.length >= 3)
+
+    for (const line of lines) {
+        const indexStatus = line.slice(0, 1)
+        const workTreeStatus = line.slice(1, 2)
+        let rawPath = line.slice(3).trim()
+
+        if (indexStatus === '!' && workTreeStatus === '!') continue
+
+        if (rawPath.startsWith('"') && rawPath.endsWith('"')) {
+            rawPath = rawPath.slice(1, -1).replace(/\\"/g, '"')
+        }
+
+        let filePath = rawPath
+        let origPath: string | undefined
+
+        if (rawPath.includes(' -> ')) {
+            const parts = rawPath.split(' -> ')
+            origPath = parts[0].replace(/\\/g, '/')
+            filePath = parts[1].replace(/\\/g, '/')
+        } else {
+            filePath = filePath.replace(/\\/g, '/')
+        }
+
+        dirtyFiles.push({ indexStatus, workTreeStatus, filePath, origPath })
+
+        const hitsCurrent = filePath.startsWith(targetPrefix) || filePath === relTarget
+        const hitsOrig = origPath ? origPath.startsWith(targetPrefix) || origPath === relTarget : false
+
+        if (hitsCurrent || hitsOrig) {
+            intersectingFiles.push(filePath)
+            if (hitsOrig && origPath) intersectingFiles.push(origPath)
+        }
+    }
+
+    return {
+        clean: intersectingFiles.length === 0,
+        repoRoot,
+        dirtyFiles,
+        intersectingFiles,
+    }
+}
+
+export const progressLibrarySaga = async (
+    cpy: LibraryModel,
+    bal: LibraryBit,
+    ste: State,
+) => {
+    const fs = require('fs-extra')
+    const path = require('path')
+
+    let targets: string[] = []
+    if (bal && bal.lst && Array.isArray(bal.lst)) {
+        targets = bal.lst.map((t: string) => t.replace(/[\[\]]/g, '').trim())
+    } else if (bal && bal.src) {
+        targets = [bal.src.replace(/[\[\]]/g, '').trim()]
+    }
+
+    targets = targets.filter(Boolean)
+
+    if (targets.length === 0) {
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [SAGA_ERR] No target directories provided for propagation.',
+            })
+        }
+        if (bal && bal.slv) {
+            bal.slv({
+                libBit: {
+                    idx: 'progress-library-saga-error',
+                    src: 'No targets provided',
+                    val: 0,
+                },
+            })
+        }
+        return cpy
+    }
+
+    let sourceDir = bal.dat?.sourceDir
+    if (!sourceDir) {
+        sourceDir = path.resolve(process.cwd(), 'apps', '995.library')
+        if (!fs.existsSync(sourceDir)) {
+            if (fs.existsSync(path.resolve(process.cwd(), '995.library'))) {
+                sourceDir = process.cwd()
+            }
+        }
+    }
+
+    const sagaJournal = {
+        sagaId: `saga-fs-${Date.now()}`,
+        targetsCompleted: [] as string[],
+        targetsFailed: [] as string[],
+        backups: new Map<string, string>(),
+    }
+
+    if (ste) {
+        await ste.hunt(ActCns.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: `>> [SAGA START] Synchronizing 995.library across ${targets.length} target(s)...`,
+        })
+    }
+
+    const EXCLUDED_NAMES = new Set([
+        '.env',
+        '.git',
+        'node_modules',
+        'dist',
+        '.wrangler',
+        '.tsbuildinfo',
+        'coverage',
+    ])
+
+    const copyFilter = (srcPath: string) => {
+        const base = path.basename(srcPath)
+        if (EXCLUDED_NAMES.has(base)) return false
+        if (base.startsWith('.env.')) return false
+        if (base.endsWith('.tsbuildinfo')) return false
+        return true
+    }
+
+    for (const rawTarget of targets) {
+        const resolvedTarget = path.isAbsolute(rawTarget)
+            ? rawTarget
+            : path.resolve(process.cwd(), rawTarget)
+
+        // =====================================================================
+        // PHASE 0: PRE-FLIGHT GIT WORKING TREE AUDIT GAUNTLET
+        // =====================================================================
+        const gitStatus = await checkGitWorkingTree(resolvedTarget)
+        if (!gitStatus.clean) {
+            if (ste) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> ==============================================================',
+                })
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> [PRE-FLIGHT GUARD ALERT] TARGET WORKING TREE DIRTY',
+                })
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> Target Directory : ${resolvedTarget}`,
+                })
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> Git Repository   : ${gitStatus.repoRoot}`,
+                })
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> Intersecting Dels: ${gitStatus.intersectingFiles.length} uncommitted file(s) detected!`,
+                })
+                for (const file of gitStatus.intersectingFiles) {
+                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>>   [DIRTY] ${file}`,
+                    })
+                }
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> [SAFETY ABORT] Directory staging halted. Existing code preserved.',
+                })
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> ==============================================================',
+                })
+            }
+
+            sagaJournal.targetsFailed.push(`${resolvedTarget} (DIRTY_WORKING_TREE)`)
+            break
+        }
+
+        const targetParent = path.dirname(resolvedTarget)
+        const nonce = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+        const stagingDir = path.join(targetParent, `.tmp_staging_995_library_${nonce}`)
+        const backupDir = path.join(targetParent, `.tmp_backup_995_library_${nonce}`)
+
+        try {
+            if (ste) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [STAGING] Target: ${resolvedTarget}`,
+                })
+            }
+
+            await fs.ensureDir(stagingDir)
+            await fs.copy(sourceDir, stagingDir, {
+                dereference: true,
+                filter: copyFilter,
+            })
+
+            const targetExists = await fs.pathExists(resolvedTarget)
+            if (targetExists) {
+                await fs.rename(resolvedTarget, backupDir)
+                sagaJournal.backups.set(resolvedTarget, backupDir)
+                if (ste) {
+                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [BACKUP] Sibling backup created: ${backupDir}`,
+                    })
+                }
+            }
+
+            await fs.rename(stagingDir, resolvedTarget)
+
+            if (await fs.pathExists(backupDir)) {
+                await fs.remove(backupDir)
+            }
+
+            sagaJournal.targetsCompleted.push(resolvedTarget)
+
+            if (ste) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [SUCCESS] Promoted library -> ${resolvedTarget}`,
+                })
+            }
+        } catch (err: any) {
+            if (ste) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [ERROR] Staging failed on ${resolvedTarget}: ${err.message}`,
+                })
+            }
+
+            if ((await fs.pathExists(backupDir)) && !(await fs.pathExists(resolvedTarget))) {
+                try {
+                    await fs.rename(backupDir, resolvedTarget)
+                    if (ste) {
+                        await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                            idx: 'cns00',
+                            src: `>> [RESTORED] Pre-existing target restored from backup: ${resolvedTarget}`,
+                        })
+                    }
+                } catch (restoreErr: any) {
+                    if (ste) {
+                        await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                            idx: 'cns00',
+                            src: `>> [CRITICAL] Failed to restore backup: ${restoreErr.message}`,
+                        })
+                    }
+                }
+            }
+
+            if (await fs.pathExists(stagingDir)) {
+                await fs.remove(stagingDir)
+            }
+
+            sagaJournal.targetsFailed.push(resolvedTarget)
+            break
+        }
+    }
+
+    const isSuccess = sagaJournal.targetsFailed.length === 0
+
+    if (ste) {
+        await ste.hunt(ActCns.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: `>> [SAGA FINISHED] Completed: ${sagaJournal.targetsCompleted.length} | Failed: ${sagaJournal.targetsFailed.length}`,
+        })
+    }
+
+    if (bal && bal.slv) {
+        bal.slv({
+            libBit: {
+                idx: isSuccess ? 'progress-library-saga' : 'progress-library-saga-error',
+                val: sagaJournal.targetsCompleted.length,
+                dat: sagaJournal,
+            },
+        })
+    }
+
+    return cpy
+}
+
+
 export const resolveFleetRoot = (
     startDir: string = process.cwd(),
 ): string | null => {

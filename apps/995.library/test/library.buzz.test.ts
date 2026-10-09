@@ -255,7 +255,9 @@ test.serial(
         const model = makeModel()
         const action = new ScanFleet(bal)
 
+        process.env.FLEET_ROOT = __dirname // mock
         const resultModel = reducer(model, action, ste)
+        delete process.env.FLEET_ROOT
         t.truthy(resultModel, 'Reducer must return state model')
         t.true(bal.slv.calledOnce, 'bal.slv should be called once by scanFleet stub')
 
