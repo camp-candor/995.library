@@ -61,3 +61,42 @@ test('Phase 4 Headless: fleetMenu and sagaTornStateMenu resolve safely without T
     t.is(tornResolved?.mnuBit?.idx, 'saga-torn-state-menu-headless');
     t.is(tornResolved?.mnuBit?.dat?.sagaId, 'saga-test-01');
 });
+
+test('Phase 4 Negative Control: sagaTornStateMenu handles missing or malformed journal payloads safely', async (t) => {
+    const model = new MenuModel();
+    let tornResolved: any = null;
+
+    // Missing dat payload
+    await sagaTornStateMenu(
+        model,
+        {
+            idx: 'test-torn-missing',
+            slv: (res: any) => {
+                tornResolved = res;
+            },
+        },
+        null as any,
+    );
+
+    t.is(tornResolved?.mnuBit?.idx, 'saga-torn-state-menu-headless');
+    t.is(tornResolved?.mnuBit?.dat?.sagaId, 'saga-fs-unknown');
+    t.deepEqual(tornResolved?.mnuBit?.dat?.targetsCompleted, []);
+    t.deepEqual(tornResolved?.mnuBit?.dat?.targetsFailed, ['target/unknown (ERROR)']);
+
+    // Malformed dat payload (empty object)
+    tornResolved = null;
+    await sagaTornStateMenu(
+        model,
+        {
+            idx: 'test-torn-empty',
+            dat: {} as any,
+            slv: (res: any) => {
+                tornResolved = res;
+            },
+        },
+        null as any,
+    );
+
+    t.is(tornResolved?.mnuBit?.idx, 'saga-torn-state-menu-headless');
+});
+
