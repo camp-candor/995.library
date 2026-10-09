@@ -796,13 +796,138 @@ export const flatLibrary = async (
     return cpy
 }
 
-export const scanFleet = (
+/**
+ * Resolves the master workspace root (FLEET_ROOT) across multi-tenant organizations.
+ * Evaluates explicit environment overrides, sentinel lockfiles, and organization markers
+ * while defending against CI runner traps and filesystem escape loops.
+ */
+export const resolveFleetRoot = (
+    startDir: string = process.cwd(),
+): string | null => {
+    const fs = require('fs-extra')
+    const path = require('path')
+
+    // 1. Primary: Explicit environment variables
+    if (process.env.FLEET_ROOT) {
+        const candidate = path.resolve(process.cwd(), process.env.FLEET_ROOT)
+        try {
+            if (
+                fs.existsSync(candidate) &&
+                fs.statSync(candidate).isDirectory()
+            ) {
+                return candidate
+            }
+        } catch {
+            // Ignore access errors on invalid env paths
+        }
+    }
+
+    if (process.env.WORK_DIR) {
+        const candidate = path.resolve(process.cwd(), process.env.WORK_DIR)
+        try {
+            if (
+                fs.existsSync(candidate) &&
+                fs.statSync(candidate).isDirectory()
+            ) {
+                return candidate
+            }
+        } catch {
+            // Ignore access errors on invalid env paths
+        }
+    }
+
+    // 2. Secondary: Upward sentinel and organizational crawl
+    let current = path.resolve(startDir)
+    const root = path.parse(current).root
+
+    while (current && current !== root) {
+        // CI Runner Guard: bypass /home/runner/work without sentinels
+        const normalizedCurrent = current
+            .replace(/^[a-zA-Z]:/, '')
+            .replace(/\\/g, '/')
+        const isCiRunnerPath =
+            current === '/home/runner/work' ||
+            path.dirname(current) === '/home/runner' ||
+            normalizedCurrent === '/home/runner/work' ||
+            normalizedCurrent === '/home/runner' ||
+            normalizedCurrent.startsWith('/home/runner/')
+
+        if (!isCiRunnerPath) {
+            // Check for Cauldron Sentinel Anchor
+            const cauldronAnchor = path.join(
+                current,
+                'camp-candor-cauldron',
+                'versions.json',
+            )
+            if (fs.existsSync(cauldronAnchor)) {
+                return current
+            }
+
+            const directAnchor = path.join(current, 'versions.json')
+            if (
+                fs.existsSync(directAnchor) &&
+                path.basename(current) === 'camp-candor-cauldron'
+            ) {
+                return path.resolve(current, '..')
+            }
+
+            // Check for multi-tenant organization markers or thematic clusters
+            const hasOrgClusters =
+                fs.existsSync(path.join(current, 'campc-it-com')) ||
+                fs.existsSync(path.join(current, 'cauldron-it-com')) ||
+                fs.existsSync(path.join(current, 'astro-kahn-it-com')) ||
+                fs.existsSync(path.join(current, 'slopratchet.com')) ||
+                (fs.existsSync(path.join(current, '00.governance')) &&
+                    fs.existsSync(path.join(current, '01.canon')))
+
+            if (hasOrgClusters) {
+                return current
+            }
+
+            // Generic 'work' workspace directory name match
+            if (
+                path.basename(current).toLowerCase() === 'work' ||
+                path.basename(current).toLowerCase() === 'cauldron-it-com'
+            ) {
+                return current
+            }
+        }
+
+        const parent = path.dirname(current)
+        if (parent === current) break
+        current = parent
+    }
+
+    return null
+}
+
+export const scanFleet = async (
     cpy: LibraryModel,
     bal: LibraryBit,
     ste: State,
 ) => {
+    const fleetRoot = resolveFleetRoot()
+
+    if (!fleetRoot) {
+        if (ste) {
+            const ActCns = require('../../83.console.unit/console.action')
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [SCAN_FLEET_ERR] Unable to resolve fleet root boundary.',
+            })
+        }
+        if (bal && bal.slv != null) {
+            bal.slv({ libBit: { idx: 'scan-fleet-error', lst: [], val: -1 } })
+        }
+        return cpy
+    }
+
+    // Phase 2 stub resolves discovered root; Phase 3 will populate complete fleetMap
     if (bal && bal.slv != null) {
-        bal.slv({ libBit: { idx: 'scan-fleet', lst: [] } })
+        bal.slv({
+            libBit: { idx: 'scan-fleet', lst: [], src: fleetRoot, val: 0 },
+        })
     }
     return cpy
 }
+
