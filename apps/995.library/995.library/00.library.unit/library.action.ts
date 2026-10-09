@@ -51,7 +51,21 @@ export class FlatLibrary implements Action {
     constructor(public bale?: LibraryBit) {}
 }
 
+export const CHECK_GIT_WORKING_TREE = '[Git action] Check Git Working Tree'
+export class CheckGitWorkingTree implements Action {
+    readonly type = CHECK_GIT_WORKING_TREE
+    constructor(public bale: LibraryBit) {}
+}
+
+export const PROGRESS_LIBRARY_SAGA = '[Progress action] Progress Library Saga'
+export class ProgressLibrarySaga implements Action {
+    readonly type = PROGRESS_LIBRARY_SAGA
+    constructor(public bale: LibraryBit) {}
+}
+
 export type Actions =
+    | CheckGitWorkingTree
+    | ProgressLibrarySaga
     | InitLibrary
     | UpdateLibrary
     | ListLibrary
