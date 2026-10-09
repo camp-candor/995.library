@@ -84,7 +84,12 @@ export const closeTerminal = (
     bal: TerminalBit,
     ste: State,
 ) => {
-    if (cpy.screen != null) cpy.screen.destroy()
+    if (cpy.screen != null) {
+        if (typeof cpy.screen.leave === 'function') {
+            cpy.screen.leave()
+        }
+        cpy.screen.destroy()
+    }
 
     cpy.blessed = null
     cpy.contrib = null

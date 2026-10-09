@@ -538,125 +538,98 @@ export const updateUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
         return cpy
     }
 
-    const listBuzz = (await FS.readFile(buzzFile, 'utf8')).split('\n')
-    const listBuzzer = (await FS.readFile(buzzerFile, 'utf8')).split('\n')
-    const listAction = (await FS.readFile(actionFile, 'utf8')).split('\n')
-    const listReduce = (await FS.readFile(reduceFile, 'utf8')).split('\n')
+    const contentBuzz = await FS.readFile(buzzFile, 'utf8')
+    const contentBuzzer = await FS.readFile(buzzerFile, 'utf8')
+    const contentAction = await FS.readFile(actionFile, 'utf8')
+    const contentReduce = await FS.readFile(reduceFile, 'utf8')
 
-    const updateBuzz = (lst: string[]) => {
-        const out: string[] = []
-        const buzNom = nom + rootUpper
-        const cpyNom = rootUpper + 'Model'
-        const balNom = rootUpper + 'Bit'
+    const actUpr = (nom + '_' + rootUpper).toUpperCase()
+    const actTle = nomUpper + rootUpper
+    const actMsg = `[${nomUpper} action] ${nomUpper} ${rootUpper}`
+    const buzNom = nom + rootUpper
+    const bitNom = rootUpper + 'Bit'
+
+    // 1. Resilient Regex-based Action Injection with Idempotency
+    const actionsUnionRegex = /(export\s+type\s+Actions\s*=)([\s\S]*?)(;|$)/
+
+    const updateAction = (content: string) => {
+        if (content.includes(`class ${actTle}`) || content.includes(`export const ${actUpr} =`)) {
+            return content
+        }
+
+        const newConstAndClass = `export const ${actUpr} = "${actMsg}"\nexport class ${actTle} implements Action {\n    readonly type = ${actUpr}\n    constructor(public bale: ${bitNom}) {}\n}\n\n`
+
+        const match = content.match(actionsUnionRegex)
+        if (!match || match.index === undefined) {
+            return content + '\n' + newConstAndClass
+        }
+
+        const beforeUnion = content.slice(0, match.index)
+        const afterUnion = content.slice(match.index + match[0].length)
+
+        const prefix = match[1]
+        let body = match[2]
+        const semi = match[3] || ';'
+
+        if (!body.includes(actTle)) {
+            if (body.includes('\n')) {
+                body = body.trimEnd() + '\n    | ' + actTle
+            } else {
+                body = body.trimEnd() + ' | ' + actTle
+            }
+        }
+
+        const updatedUnion = prefix + body + semi
+        return beforeUnion + newConstAndClass + updatedUnion + afterUnion
+    }
+
+    // 2. Resilient Reducer Injection with Idempotency
+    const updateReduce = (content: string) => {
+        if (content.includes(`case Act.${actUpr}:`)) {
+            return content
+        }
+
+        const caseBlock = `        case Act.${actUpr}:\n            return Buzz.${buzNom}(clone(model), act.bale, state)\n\n`
+        const defaultIndex = content.indexOf('default:')
+        if (defaultIndex === -1) {
+            return content
+        }
+        return content.slice(0, defaultIndex) + caseBlock + content.slice(defaultIndex)
+    }
+
+    // 3. Buzzer Re-export Injection with Idempotency
+    const updateBuzzer = (content: string) => {
+        if (content.includes(buzNom)) {
+            return content
+        }
+        const exportLine = `export { ${buzNom} } from './buz/${root}.buzz';\n`
+        return content.trimEnd() + '\n' + exportLine
+    }
+
+    // 4. Buzz Handler Injection with Idempotency
+    const updateBuzz = (content: string) => {
+        if (content.includes(`export const ${buzNom} =`)) {
+            return content
+        }
+        const gel = { buzNom, cpyNom: rootUpper + 'Model', balNom: rootUpper + 'Bit', nom: root }
         const lineList = cpy.buzzTemplate.toString().split('\n')
-        const gel = { buzNom, cpyNom, balNom }
-
-        out.push('')
-        lineList.forEach((a) => {
+        const out: string[] = ['']
+        lineList.forEach((a: string) => {
             const doTCompiled = doT.template(a)
             out.push(doTCompiled(gel))
         })
-        return { lst: lst.concat(out) }
+        return content.trimEnd() + '\n' + out.join('\n') + '\n'
     }
 
-    const updateActionUpper = (lst: string[]) => {
-        const out: string[] = []
-        let dex = 0
-        lst.forEach((a, b) => {
-            if (a.includes('export type Actions') == true) dex = b
-        })
-        let actUpr = nom + '_' + rootUpper
-        actUpr = actUpr.toUpperCase()
-        const actMsg = '[' + nomUpper + ' action] ' + nomUpper + ' ' + rootUpper
-        const actTle = nomUpper + rootUpper
-        const lineList = cpy.actTemplate.toString().split('\n')
-        const gel = { actUpr, actMsg, actTle }
-        lineList.forEach((a) => {
-            const doTCompiled = doT.template(a)
-            out.push(doTCompiled(gel))
-        })
-        return { lst: out, val: dex }
-    }
+    const resultAction = updateAction(contentAction)
+    const resultReduce = updateReduce(contentReduce)
+    const resultBuzzer = updateBuzzer(contentBuzzer)
+    const resultBuzz = updateBuzz(contentBuzz)
 
-    const updateActionLower = (lst: string[]) => {
-        const out: string[] = []
-        let dex = 0
-        lst.forEach((a, b) => {
-            if (a.includes('export type Actions =') == true) dex = b
-        })
-        const actTle = nomUpper + rootUpper
-        const lineList = cpy.actTemplateLower.toString().split('\n')
-        const gel = { actTle }
-        lineList.forEach((a) => {
-            const doTCompiled = doT.template(a)
-            out.push(doTCompiled(gel))
-        })
-        return { lst: out, val: dex }
-    }
-
-    const updateReduce = (lst: string[]) => {
-        const out: string[] = []
-        let dex = 0
-        lst.forEach((a, b) => {
-            if (a.includes('default') == true) dex = b
-        })
-        let actUpr = nom + '_' + rootUpper
-        actUpr = actUpr.toUpperCase()
-        const actTle = nom + rootUpper
-        const lineList = cpy.reduceTemplate.toString().split('\n')
-        const gel = { actUpr, actTle }
-        lineList.forEach((a) => {
-            const doTCompiled = doT.template(a)
-            out.push(doTCompiled(gel))
-        })
-        return { lst: out, val: dex }
-    }
-
-    const updateBuzzer = (lst: string[]) => {
-        const actTle = nom + rootUpper
-        const lineList = cpy.buzzerTemplate.toString().split('\n')
-        const gel = { actTle, root }
-        lineList.forEach((a) => {
-            const doTCompiled = doT.template(a)
-            lst.push(doTCompiled(gel))
-        })
-        return { lst }
-    }
-
-    const buzzBit = updateBuzz(listBuzz)
-    const buzzerBit = updateBuzzer(listBuzzer)
-    const actionUpperBit = updateActionUpper(listAction)
-    const actionLowerBit = updateActionLower(listAction)
-    const reduceBit = updateReduce(listReduce)
-
-    const merge = (a: any[], b: any[], i = 0) => {
-        return a.slice(0, i).concat(b, a.slice(i))
-    }
-
-    const resultBuzz = buzzBit.lst
-    const resultBuzzer = buzzerBit.lst.filter((e) => e.length > 2)
-    const resultReduce = merge(listReduce, reduceBit.lst, reduceBit.val)
-    let resultActionUpper = merge(
-        listAction,
-        actionUpperBit.lst,
-        actionUpperBit.val,
-    )
-    const upperActionDex = updateActionUpper(resultActionUpper).val
-    const lowerDex = actionLowerBit.val
-    let lowerActionList = listAction.slice(lowerDex, listAction.length)
-    lowerActionList.forEach((a, b) => {
-        lowerActionList[b] = a.replace(';', '')
-    })
-    lowerActionList = lowerActionList.filter((e) => e.length >= 2)
-    lowerActionList.push('| ' + nomUpper + rootUpper)
-    lowerActionList.unshift(' ')
-    resultActionUpper = resultActionUpper.slice(0, upperActionDex)
-    const resultAction = resultActionUpper.concat(lowerActionList)
-
-    await FS.writeFile(buzzFile, resultBuzz.join('\n'))
-    await FS.writeFile(buzzerFile, resultBuzzer.join('\n'))
-    await FS.writeFile(reduceFile, resultReduce.join('\n'))
-    await FS.writeFile(actionFile, resultAction.join('\n'))
+    await FS.outputFile(buzzFile, resultBuzz)
+    await FS.outputFile(buzzerFile, resultBuzzer)
+    await FS.outputFile(reduceFile, resultReduce)
+    await FS.outputFile(actionFile, resultAction)
 
     // Deterministic Zero-Delay Resolution
     if (bal.slv != null) {
