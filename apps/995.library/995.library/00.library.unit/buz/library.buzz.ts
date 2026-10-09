@@ -1,3 +1,9 @@
+
+import type { AuditReport, RepoAuditRecord, AuditStatus } from "../fce/audit.interface"
+import { promisify } from "util"
+import { execFile as execFileCb } from "child_process"
+import * as path from "path"
+import fs from "fs-extra"
 import type { LibraryModel } from '../library.model'
 import type LibraryBit from '../fce/library.bit'
 import type State from '../../99.core/state'
@@ -1657,13 +1663,220 @@ export const progressLibrarySaga = async (
     return cpy;
 
 }
-export const auditLibrary = (
+
+const execFile = promisify(execFileCb)
+
+const safeQueryGit = async (cwd: string, args: string[]): Promise<string | null> => {
+    try {
+        const { stdout } = await execFile("git", args, { cwd, timeout: 5000 })
+        return stdout.trim()
+    } catch {
+        return null
+    }
+}
+
+export const auditLibrary = async (
     cpy: LibraryModel,
     bal: LibraryBit,
     ste: State,
-) => {
-    if (bal && bal.slv != null) {
-        bal.slv({ libBit: { idx: 'audit-library', dat: null, val: 0 } })
+): Promise<LibraryModel> => {
+    const emit = async (src: string) => {
+        if (ste && typeof ste.hunt === 'function') {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src }).catch(() => {})
+        }
     }
+
+    await emit('>> [AUDIT] Initiating Fleet Version Drift Analysis...')
+
+    // 1. Resolve Manifest Path
+    let manifestPath = bal?.src || (bal?.dat && bal.dat.manifestPath)
+    if (!manifestPath) {
+        const candidates = [
+            path.resolve(process.cwd(), 'apps/995.library/data/versions.json'),
+            path.resolve(process.cwd(), 'data/versions.json'),
+        ]
+        manifestPath = candidates.find((p) => fs.existsSync(p))
+    }
+
+    if (!manifestPath || !fs.existsSync(manifestPath)) {
+        await emit('::error:: versions.json manifest missing!')
+        if (bal?.slv) {
+            bal.slv({ libBit: { idx: 'audit-library-error', val: 0, dat: null, src: manifestPath || '' } })
+        }
+        return cpy
+    }
+
+    let manifest: any
+    try {
+        manifest = fs.readJsonSync(manifestPath)
+    } catch (err: any) {
+        await emit(`::error:: Manifest parse failure: ${err.message}`)
+        if (bal?.slv) {
+            bal.slv({ libBit: { idx: 'audit-library-error', val: 0, dat: null, src: manifestPath } })
+        }
+        return cpy
+    }
+
+    // 2. Identify Workspace Root & Sovereign Authority
+    const fleetRoot = resolveFleetRoot() || path.resolve(process.cwd(), '../../')
+    const sovereignRepo = manifest.sovereign_repo || 'camp-candor/995.library'
+    const activeRepoName = path.basename(process.cwd())
+    const isSovereign = sovereignRepo.endsWith(activeRepoName) || sovereignRepo === activeRepoName
+
+    if (!isSovereign) {
+        await emit(`>> [SOVEREIGNTY WARNING] Active repo [${activeRepoName}] is NOT designated sovereign [${sovereignRepo}]!`)
+    } else {
+        await emit(`>> [OK] Sovereign Node verified: ${sovereignRepo}`)
+    }
+
+    const records: RepoAuditRecord[] = []
+    const canonicalLibVersion = manifest.library_version || '1.0.12'
+    const targetRepos = manifest.repositories || manifest.repos || {}
+    const trackedPaths = new Set<string>()
+
+    // 3. Inspect Declared Repositories
+    for (const [repoKey, rawConfig] of Object.entries(targetRepos)) {
+        const cfg = rawConfig as any
+        const relPath = cfg.path || repoKey
+        const targetPath = path.isAbsolute(relPath) ? relPath : path.resolve(fleetRoot, relPath)
+        trackedPaths.add(path.resolve(targetPath))
+
+        const expectedVersion = cfg.required_contract_version || canonicalLibVersion
+        const expectedBranch = cfg.expected_branch || cfg.ref || 'main'
+        const pinnedSha = cfg.pinned_sha || cfg.pinned_commit || ''
+
+        if (!fs.existsSync(targetPath)) {
+            records.push({
+                repo: repoKey,
+                cluster: cfg.cluster,
+                path: relPath,
+                expectedVersion,
+                expectedBranch,
+                pinnedSha,
+                status: 'MISSING',
+                notes: 'Directory not found on disk',
+            })
+            continue
+        }
+
+        // Check installed apps/995.library/package.json
+        const pkgJsonPath = path.join(targetPath, 'apps/995.library/package.json')
+        let installedVersion: string | undefined
+        if (fs.existsSync(pkgJsonPath)) {
+            try {
+                const pkg = fs.readJsonSync(pkgJsonPath)
+                installedVersion = pkg.version
+            } catch {
+                installedVersion = undefined
+            }
+        }
+
+        // Query Git State
+        const actualBranch = (await safeQueryGit(targetPath, ['rev-parse', '--abbrev-ref', 'HEAD'])) || undefined
+        const actualSha = (await safeQueryGit(targetPath, ['rev-parse', 'HEAD'])) || undefined
+
+        // Determine Drift Status
+        let status: AuditStatus = 'ALIGNED'
+        const notes: string[] = []
+
+        if (!installedVersion) {
+            status = 'UNREADABLE'
+            notes.push('Missing apps/995.library/package.json')
+        } else if (installedVersion !== expectedVersion) {
+            status = 'DRIFT_VERSION'
+            notes.push(`v${installedVersion} != expected v${expectedVersion}`)
+        } else if (actualBranch && actualBranch !== expectedBranch) {
+            status = 'DRIFT_BRANCH'
+            notes.push(`branch ${actualBranch} != expected ${expectedBranch}`)
+        } else if (pinnedSha && actualSha && actualSha !== pinnedSha) {
+            status = 'DRIFT_VERSION'
+            notes.push(`sha ${actualSha.slice(0, 7)} != pinned ${pinnedSha.slice(0, 7)}`)
+        }
+
+        records.push({
+            repo: repoKey,
+            cluster: cfg.cluster,
+            path: relPath,
+            expectedVersion,
+            installedVersion,
+            expectedBranch,
+            actualBranch,
+            pinnedSha,
+            actualSha,
+            status,
+            notes: notes.join('; ') || undefined,
+        })
+    }
+
+    // 4. Discover Unmanaged Repositories
+    try {
+        if (fs.existsSync(fleetRoot)) {
+            const rootEntries = fs.readdirSync(fleetRoot, { withFileTypes: true })
+            for (const entry of rootEntries) {
+                if (!entry.isDirectory() || entry.name.startsWith('.') || entry.name === 'node_modules') continue
+                const candidatePath = path.join(fleetRoot, entry.name)
+                if (trackedPaths.has(candidatePath)) continue
+
+                if (fs.existsSync(path.join(candidatePath, 'apps/995.library/package.json'))) {
+                    let discoveredVer = 'unknown'
+                    try {
+                        discoveredVer = fs.readJsonSync(path.join(candidatePath, 'apps/995.library/package.json')).version
+                    } catch {}
+
+                    records.push({
+                        repo: entry.name,
+                        path: entry.name,
+                        expectedVersion: canonicalLibVersion,
+                        installedVersion: discoveredVer,
+                        expectedBranch: 'main',
+                        status: 'UNMANAGED',
+                        notes: 'Discovered apps/995.library omitted from manifest',
+                    })
+                }
+            }
+        }
+    } catch {}
+
+    // 5. Compile Statistics & Stream Telemetry
+    const alignedCount = records.filter((r) => r.status === 'ALIGNED').length
+    const driftedCount = records.filter((r) => r.status !== 'ALIGNED').length
+
+    const report: AuditReport = {
+        isSovereign,
+        sovereignRepo,
+        activeRepo: activeRepoName,
+        totalTracked: records.length,
+        alignedCount,
+        driftedCount,
+        records,
+        timestamp: new Date().toISOString(),
+    }
+
+    await emit('>> ================================================================')
+    await emit('>> REPOSITORY          | STATUS         | INSTALLED | EXPECTED | NOTES')
+    await emit('>> --------------------+----------------+-----------+----------+-----------')
+    for (const r of records) {
+        const namePad = r.repo.padEnd(19).slice(0, 19)
+        const statPad = `[${r.status}]`.padEnd(14).slice(0, 14)
+        const instPad = (r.installedVersion || 'N/A').padEnd(9).slice(0, 9)
+        const expPad = r.expectedVersion.padEnd(8).slice(0, 8)
+        const noteStr = r.notes || ''
+        await emit(`>> ${namePad} | ${statPad} | ${instPad} | ${expPad} | ${noteStr}`)
+    }
+    await emit('>> ----------------------------------------------------------------')
+    await emit(`>> AUDIT SUMMARY: Total: ${records.length} | Aligned: ${alignedCount} | Drifted: ${driftedCount}`)
+    await emit('>> ================================================================')
+
+    if (bal?.slv) {
+        bal.slv({
+            libBit: {
+                idx: 'audit-library',
+                dat: report,
+                val: driftedCount,
+                src: manifestPath,
+            },
+        })
+    }
+
     return cpy
 }
