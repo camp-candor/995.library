@@ -1,6 +1,7 @@
 import type { LibraryModel } from '../library.model'
 import type LibraryBit from '../fce/library.bit'
 import type State from '../../99.core/state'
+import fs from 'fs-extra'
 
 import * as ActMnu from '../../98.menu.unit/menu.action'
 import * as ActBus from '../../99.bus.unit/bus.action'
@@ -11,6 +12,7 @@ import * as ActLib from '../library.action'
 let bit, val, idx, dex, lst, dat
 
 const exec = require('child_process').exec
+import * as fse from 'fs-extra'
 
 export const ZERO_TRUST_EXCLUDED_NAMES = new Set([
     '.env',
@@ -41,7 +43,7 @@ export const stageLibraryPayload = async (
     targetDir: string,
     nonce?: string,
 ): Promise<{ stagingDir: string; parentDir: string }> => {
-    const fs = require('fs-extra');
+
     const path = require('path');
 
     const resolvedTarget = path.isAbsolute(targetDir)
@@ -1254,6 +1256,107 @@ export const checkGitWorkingTree = async (targetDir: string): Promise<GitTreeSta
     }
 }
 
+export const retryAtomicRename = async (
+    oldPath: string,
+    newPath: string,
+    maxRetries = 5,
+    initialDelayMs = 50,
+): Promise<void> => {
+    let attempt = 0;
+    let delay = initialDelayMs;
+
+    while (attempt < maxRetries) {
+        try {
+            await fs.rename(oldPath, newPath);
+            return;
+        } catch (err: any) {
+            attempt++;
+            const isLockError = err.code === 'EBUSY' || err.code === 'EPERM' || err.code === 'EACCES';
+            if (!isLockError || attempt >= maxRetries) {
+                throw new Error(
+                    `[ATOMIC_RENAME_FAILED] Failed to rename '${oldPath}' to '${newPath}' after ${attempt} attempt(s): ${err.message}`,
+                );
+            }
+            // Exponential jitter delay
+            const jitter = Math.floor(Math.random() * 20);
+            await new Promise((resolve) => setTimeout(resolve, delay + jitter));
+            delay *= 2;
+        }
+    }
+};
+
+export const swapAtomicInodes = async (
+    stagingDir: string,
+    targetDir: string,
+    backupDir: string,
+    ste?: State,
+): Promise<{ promoted: boolean; restored: boolean; error?: Error }> => {
+    let backupCreated = false;
+
+    try {
+        const targetExists = await fs.pathExists(targetDir);
+
+        // Step B: Atomically backup existing target if present
+        if (targetExists) {
+            if (ste) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [BACKUP] Shifting active target -> ${backupDir}`,
+                });
+            }
+            await retryAtomicRename(targetDir, backupDir);
+            backupCreated = true;
+        }
+
+        // Step C: Atomically promote staging directory into target directory
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [PROMOTION] Inode pointer swap -> ${targetDir}`,
+            });
+        }
+        await retryAtomicRename(stagingDir, targetDir);
+
+        // Step D: Teardown backup after verified atomic swap
+        if (backupCreated && (await fs.pathExists(backupDir))) {
+            await fs.remove(backupDir);
+        }
+
+        return { promoted: true, restored: false };
+    } catch (swapErr: any) {
+        let restored = false;
+
+        // Immediate Forward-Recovery Compensation
+        if (backupCreated && (await fs.pathExists(backupDir)) && !(await fs.pathExists(targetDir))) {
+            try {
+                await retryAtomicRename(backupDir, targetDir);
+                restored = true;
+                if (ste) {
+                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [COMPENSATION] Target restored from sibling backup: ${targetDir}`,
+                    });
+                }
+            } catch (restoreErr: any) {
+                if (ste) {
+                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [CRITICAL] Failed to restore backup: ${restoreErr.message}`,
+                    });
+                }
+            }
+        }
+
+        // Purge orphaned staging directory
+        if (await fs.pathExists(stagingDir)) {
+            await fs.remove(stagingDir).catch(() => {});
+        }
+
+        return { promoted: false, restored, error: swapErr };
+    }
+};
+
+
 export const progressLibrarySaga = async (
     cpy: LibraryModel,
     bal: LibraryBit,
@@ -1409,24 +1512,12 @@ export const progressLibrarySaga = async (
             }
 
             // =================================================================
-            // PHASE 2: ATOMIC INODE PROMOTION
+            // PHASE 2: ATOMIC INODE PROMOTION & SWAP
             // =================================================================
-            const targetExists = await fs.pathExists(resolvedTarget);
-            if (targetExists) {
-                await fs.rename(resolvedTarget, backupDir);
-                sagaJournal.backups.set(resolvedTarget, backupDir);
-                if (ste) {
-                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                        idx: 'cns00',
-                        src: `>> [BACKUP] Sibling backup created: ${backupDir}`,
-                    });
-                }
-            }
+            const swapResult = await swapAtomicInodes(stagingDir, resolvedTarget, backupDir, ste);
 
-            await fs.rename(stagingDir, resolvedTarget);
-
-            if (await fs.pathExists(backupDir)) {
-                await fs.remove(backupDir);
+            if (!swapResult.promoted) {
+                throw swapResult.error || new Error(`[SWAP_FAULT] Inode swap failed on ${resolvedTarget}`);
             }
 
             sagaJournal.targetsCompleted.push(resolvedTarget);
@@ -1443,29 +1534,6 @@ export const progressLibrarySaga = async (
                     idx: 'cns00',
                     src: `>> [ERROR] Staging or swap failed on ${resolvedTarget}: ${err.message}`,
                 });
-            }
-
-            if ((await fs.pathExists(backupDir)) && !(await fs.pathExists(resolvedTarget))) {
-                try {
-                    await fs.rename(backupDir, resolvedTarget);
-                    if (ste) {
-                        await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                            idx: 'cns00',
-                            src: `>> [RESTORED] Pre-existing target restored from backup: ${resolvedTarget}`,
-                        });
-                    }
-                } catch (restoreErr: any) {
-                    if (ste) {
-                        await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                            idx: 'cns00',
-                            src: `>> [CRITICAL] Failed to restore backup: ${restoreErr.message}`,
-                        });
-                    }
-                }
-            }
-
-            if (stagingDir && (await fs.pathExists(stagingDir))) {
-                await fs.remove(stagingDir).catch(() => {});
             }
 
             sagaJournal.targetsFailed.push(resolvedTarget);

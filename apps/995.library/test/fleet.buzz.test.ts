@@ -13,6 +13,8 @@ import {
     progressLibrarySaga,
     filterZeroTrust,
     stageLibraryPayload,
+    retryAtomicRename,
+    swapAtomicInodes,
 } from '../995.library/00.library.unit/buz/library.buzz'
 
 const cleanEnv = () => {
@@ -738,4 +740,107 @@ test.serial('Phase 1 Staging: cleans up partial staging directory on copy failur
     const orphanedStaging = entries.filter((e) => e.startsWith('.tmp_staging_995_library_'));
 
     t.is(orphanedStaging.length, 0, 'No orphaned staging folders should remain after a staging error');
+});
+
+
+test.serial('Phase 2 Inode Swap: atomically shifts target to backup, promotes staging, and purges backup', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_swap_success_test');
+    const parentDir = path.join(sandboxDir, 'apps');
+    const targetDir = path.join(parentDir, '995.library');
+    const stagingDir = path.join(parentDir, '.tmp_staging_995_library_test');
+    const backupDir = path.join(parentDir, '.tmp_backup_995_library_test');
+
+    await fs.ensureDir(targetDir);
+    await fs.ensureDir(stagingDir);
+
+    // Initial files
+    await fs.writeFile(path.join(targetDir, 'old_version.ts'), 'export const v = 1;');
+    await fs.writeFile(path.join(stagingDir, 'new_version.ts'), 'export const v = 2;');
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {});
+    });
+
+    const result = await swapAtomicInodes(stagingDir, targetDir, backupDir);
+
+    t.true(result.promoted);
+    t.false(result.restored);
+
+    // Assert target contains new version
+    t.true(await fs.pathExists(path.join(targetDir, 'new_version.ts')));
+    t.false(await fs.pathExists(path.join(targetDir, 'old_version.ts')));
+
+    // Assert staging and backup are purged
+    t.false(await fs.pathExists(stagingDir));
+    t.false(await fs.pathExists(backupDir));
+});
+
+test.serial('Phase 2 Inode Swap: creates target cleanly if destination does not exist prior to swap', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_swap_new_target_test');
+    const parentDir = path.join(sandboxDir, 'apps');
+    const targetDir = path.join(parentDir, '995.library');
+    const stagingDir = path.join(parentDir, '.tmp_staging_995_library_fresh');
+    const backupDir = path.join(parentDir, '.tmp_backup_995_library_fresh');
+
+    await fs.ensureDir(stagingDir);
+    await fs.writeFile(path.join(stagingDir, 'fresh.ts'), 'export const fresh = true;');
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {});
+    });
+
+    const result = await swapAtomicInodes(stagingDir, targetDir, backupDir);
+
+    t.true(result.promoted);
+    t.true(await fs.pathExists(path.join(targetDir, 'fresh.ts')));
+    t.false(await fs.pathExists(stagingDir));
+    t.false(await fs.pathExists(backupDir));
+});
+
+test.serial('Phase 2 Inode Swap: rollback restores original target if Step C rename throws', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_swap_rollback_test');
+    const parentDir = path.join(sandboxDir, 'apps');
+    const targetDir = path.join(parentDir, '995.library');
+    const nonExistentStaging = path.join(parentDir, '.tmp_ghost_staging');
+    const backupDir = path.join(parentDir, '.tmp_backup_995_library_rb');
+
+    await fs.ensureDir(targetDir);
+    await fs.writeFile(path.join(targetDir, 'original.ts'), 'export const pristine = true;');
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {});
+    });
+
+    // swapAtomicInodes with ghost staging directory will fail on Step C
+    const result = await swapAtomicInodes(nonExistentStaging, targetDir, backupDir);
+
+    t.false(result.promoted);
+    t.true(result.restored, 'Target must be restored from sibling backup upon Step C failure');
+    t.truthy(result.error);
+
+    // Assert original target file restored cleanly
+    t.true(await fs.pathExists(targetDir));
+    t.true(await fs.pathExists(path.join(targetDir, 'original.ts')));
+    t.is(await fs.readFile(path.join(targetDir, 'original.ts'), 'utf8'), 'export const pristine = true;');
+
+    // Assert temporary folders unlinked
+    t.false(await fs.pathExists(backupDir));
+});
+
+test.serial('retryAtomicRename: successfully renames and handles transient retries', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_rename_retry_test');
+    const srcFile = path.join(sandboxDir, 'source.txt');
+    const destFile = path.join(sandboxDir, 'dest.txt');
+
+    await fs.ensureDir(sandboxDir);
+    await fs.writeFile(srcFile, 'hello');
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {});
+    });
+
+    await retryAtomicRename(srcFile, destFile, 3, 10);
+
+    t.false(await fs.pathExists(srcFile));
+    t.true(await fs.pathExists(destFile));
 });
