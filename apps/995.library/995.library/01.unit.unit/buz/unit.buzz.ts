@@ -199,12 +199,11 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
 
     const FS = require('fs-extra')
     const path = require('path')
-    const doT = require('dot')
+    const doT = require('dot');
+    doT.templateSettings.strip = false;
 
-    // 1. Resolve Repository Root
     const repoRoot = findRepoRoot()
 
-    // 2. Discover Template Directory
     const templateCandidates = [
         path.join(repoRoot, 'data', '00.sim.unit'),
         path.join(repoRoot, 'apps', '995.library', 'data', '00.sim.unit'),
@@ -233,7 +232,6 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
         return cpy
     }
 
-    // 3. Define Unit Identifiers & Prefix
     let num = '00'
     let nom = rawNom.toLowerCase()
 
@@ -245,7 +243,6 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
 
     const unitFolder = `${num}.${nom}.unit`
 
-    // 4. Resolve Target Directory (Supports Direct Workspace Targeting)
     let targetUnitDir: string
     if (bal.src) {
         const resolvedSrc = path.isAbsolute(bal.src)
@@ -292,7 +289,6 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
         })
     }
 
-    // 5. Collect Template Files Recursively
     function getTemplateFiles(dir: string): string[] {
         const entries = FS.readdirSync(dir, { withFileTypes: true })
         let files: string[] = []
@@ -309,7 +305,6 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
 
     const templateFiles = getTemplateFiles(templateDir)
 
-    // 6. Compile and Output Asynchronously
     for (const filePath of templateFiles) {
         const relFromTemplate = path.relative(templateDir, filePath)
 
@@ -346,17 +341,15 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
         .relative(repoRoot, targetUnitDir)
         .replace(/\\/g, '/')
 
-    // 7. Optional Automatic Manifest Synchronization
     if (ste && bal.dat?.autoWire !== false) {
         const parentPkgDir = path.dirname(targetUnitDir)
         try {
             await ste.hunt(ActLib.UPDATE_LIBRARY, { src: parentPkgDir })
         } catch {
-            // Non-blocking if target workspace lacks BEE template
+            // Ignore non-critical BEE update issues in third-party targets
         }
     }
 
-    // 8. Deterministic Zero-Delay Resolution
     if (bal.slv != null) {
         bal.slv({
             untBit: {
@@ -399,7 +392,7 @@ export const containUnit = (cpy: UnitModel, bal: UnitBit, ste: State) => {
                     return true
             }
         } catch {
-            // Ignore read errors
+            return false
         }
         return false
     }
@@ -416,7 +409,7 @@ export const containUnit = (cpy: UnitModel, bal: UnitBit, ste: State) => {
                 }
             }
         } catch {
-            // Ignore read errors
+            return false
         }
         return false
     }
@@ -469,7 +462,7 @@ export const containUnit = (cpy: UnitModel, bal: UnitBit, ste: State) => {
                 findPivots(projectPath, resultList)
             }
         }
-    } catch (err: any) {
+    } catch {
         // Ignore read errors
     }
 
@@ -482,7 +475,8 @@ export const containUnit = (cpy: UnitModel, bal: UnitBit, ste: State) => {
 export const updateUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
     const FS = require('fs-extra')
     const path = require('path')
-    const doT = require('dot')
+    const doT = require('dot');
+    doT.templateSettings.strip = false;
 
     const unitBasename = path.basename(bal.idx || '')
     const root = unitBasename.split('.')[1] || ''
@@ -506,13 +500,32 @@ export const updateUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
     }
 
     const rootUpper = root.charAt(0).toUpperCase() + root.slice(1)
-    const nom = bal.dat
+    const nom = String(bal.dat || '').trim()
+    if (!nom) {
+        if (bal.slv != null) {
+            bal.slv({
+                untBit: {
+                    idx: 'update-unit-error',
+                    src: 'Missing action verb payload (bal.dat)',
+                },
+            })
+        }
+        return cpy
+    }
+
     const nomUpper = nom.charAt(0).toUpperCase() + nom.slice(1)
+    const actUpr = `${nom.toUpperCase()}_${rootUpper.toUpperCase()}`
+    const actTle = `${nomUpper}${rootUpper}`
+    const actMsg = `[${nomUpper} action] ${nomUpper} ${rootUpper}`
+    const buzNom = `${nom}${rootUpper}`
+    const cpyNom = `${rootUpper}Model`
+    const balNom = `${rootUpper}Bit`
+    const bitNom = `${rootUpper}Bit`
 
     if (ste) {
         await ste.hunt(ActCns.UPDATE_CONSOLE, {
             idx: 'cns00',
-            src: `>> [TARGET] ${root} (${rootUpper}) in ${unitBasename}`,
+            src: `>> [AST:MUTATE] Injecting action ${actTle} into ${unitBasename}`,
         })
     }
 
@@ -521,144 +534,107 @@ export const updateUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
     const actionFile = path.resolve(bal.src, bal.idx, root + '.action.ts')
     const reduceFile = path.resolve(bal.src, bal.idx, root + '.reduce.ts')
 
-    const existBuzz = FS.existsSync(buzzFile)
-    const existBuzzer = FS.existsSync(buzzerFile)
-    const existAction = FS.existsSync(actionFile)
-    const existReduce = FS.existsSync(reduceFile)
-
-    if (!existBuzz || !existAction || !existReduce || !existBuzzer) {
+    if (
+        !FS.existsSync(buzzFile) ||
+        !FS.existsSync(actionFile) ||
+        !FS.existsSync(reduceFile) ||
+        !FS.existsSync(buzzerFile)
+    ) {
         if (bal.slv != null) {
             bal.slv({
                 untBit: {
                     idx: 'update-unit-error',
-                    src: 'no exist on source file',
+                    src: 'One or more required unit source files do not exist',
                 },
             })
         }
         return cpy
     }
 
-    const listBuzz = (await FS.readFile(buzzFile, 'utf8')).split('\n')
-    const listBuzzer = (await FS.readFile(buzzerFile, 'utf8')).split('\n')
-    const listAction = (await FS.readFile(actionFile, 'utf8')).split('\n')
-    const listReduce = (await FS.readFile(reduceFile, 'utf8')).split('\n')
+    let actionContent = await FS.readFile(actionFile, 'utf8')
+    let reduceContent = await FS.readFile(reduceFile, 'utf8')
+    let buzzerContent = await FS.readFile(buzzerFile, 'utf8')
+    let buzzContent = await FS.readFile(buzzFile, 'utf8')
 
-    const updateBuzz = (lst: string[]) => {
-        const out: string[] = []
-        const buzNom = nom + rootUpper
-        const cpyNom = rootUpper + 'Model'
-        const balNom = rootUpper + 'Bit'
-        const lineList = cpy.buzzTemplate.toString().split('\n')
-        const gel = { buzNom, cpyNom, balNom }
-
-        out.push('')
-        lineList.forEach((a) => {
-            const doTCompiled = doT.template(a)
-            out.push(doTCompiled(gel))
-        })
-        return { lst: lst.concat(out) }
+    // Idempotency: skip if action is already declared
+    if (actionContent.includes(`export const ${actUpr} =`)) {
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [AST:SKIP] Action ${actUpr} already declared in ${actionFile}`,
+            })
+        }
+        if (bal.slv != null) {
+            bal.slv({ untBit: { idx: 'update-unit', dat: bal, skipped: true } })
+        }
+        return cpy
     }
 
-    const updateActionUpper = (lst: string[]) => {
-        const out: string[] = []
-        let dex = 0
-        lst.forEach((a, b) => {
-            if (a.includes('export type Actions') == true) dex = b
-        })
-        let actUpr = nom + '_' + rootUpper
-        actUpr = actUpr.toUpperCase()
-        const actMsg = '[' + nomUpper + ' action] ' + nomUpper + ' ' + rootUpper
-        const actTle = nomUpper + rootUpper
-        const lineList = cpy.actTemplate.toString().split('\n')
-        const gel = { actUpr, actMsg, actTle }
-        lineList.forEach((a) => {
-            const doTCompiled = doT.template(a)
-            out.push(doTCompiled(gel))
-        })
-        return { lst: out, val: dex }
+    // 1. Mutate .action.ts
+    const actGel = { actUpr, actMsg, actTle, bitNom }
+    const compiledActionDecl = doT.template(cpy.actTemplate)(actGel).trim()
+
+    // Resilient Actions Union insertion
+    const actionsUnionRegex = /(export\s+type\s+Actions\s*=)([\s\S]*?)(;|$)/
+    if (actionsUnionRegex.test(actionContent)) {
+        actionContent = actionContent.replace(
+            actionsUnionRegex,
+            (_match, p1, p2) => {
+                const existingTypes = p2.trim()
+                const updatedTypes = existingTypes.length > 0
+                    ? `${existingTypes}\n    | ${actTle}`
+                    : `\n    | ${actTle}`
+                return `${compiledActionDecl}\n\n${p1} ${updatedTypes};`
+            },
+        )
+    } else {
+        // Fallback append if no Actions union is found
+        actionContent += `\n\n${compiledActionDecl}\n`
     }
 
-    const updateActionLower = (lst: string[]) => {
-        const out: string[] = []
-        let dex = 0
-        lst.forEach((a, b) => {
-            if (a.includes('export type Actions =') == true) dex = b
-        })
-        const actTle = nomUpper + rootUpper
-        const lineList = cpy.actTemplateLower.toString().split('\n')
-        const gel = { actTle }
-        lineList.forEach((a) => {
-            const doTCompiled = doT.template(a)
-            out.push(doTCompiled(gel))
-        })
-        return { lst: out, val: dex }
+    // 2. Mutate .reduce.ts
+    const reduceGel = { actUpr, actTle: buzNom }
+    const compiledReduceCase = doT.template(cpy.reduceTemplate)(reduceGel)
+
+    if (reduceContent.includes('default:')) {
+        reduceContent = reduceContent.replace(
+            /(\s+default:)/,
+            `\n${compiledReduceCase}\n$1`,
+        )
+    } else if (reduceContent.includes('default')) {
+        reduceContent = reduceContent.replace(
+            /(\s+default)/,
+            `\n${compiledReduceCase}\n$1`,
+        )
+    } else {
+        reduceContent += `\n${compiledReduceCase}\n`
     }
 
-    const updateReduce = (lst: string[]) => {
-        const out: string[] = []
-        let dex = 0
-        lst.forEach((a, b) => {
-            if (a.includes('default') == true) dex = b
-        })
-        let actUpr = nom + '_' + rootUpper
-        actUpr = actUpr.toUpperCase()
-        const actTle = nom + rootUpper
-        const lineList = cpy.reduceTemplate.toString().split('\n')
-        const gel = { actUpr, actTle }
-        lineList.forEach((a) => {
-            const doTCompiled = doT.template(a)
-            out.push(doTCompiled(gel))
-        })
-        return { lst: out, val: dex }
+    // 3. Mutate .buzzer.ts
+    const buzzerGel = { actTle: buzNom, root }
+    const compiledBuzzerExport = doT.template(cpy.buzzerTemplate)(buzzerGel).trim()
+    if (!buzzerContent.includes(compiledBuzzerExport)) {
+        buzzerContent = `${buzzerContent.trimEnd()}\n${compiledBuzzerExport}\n`
     }
 
-    const updateBuzzer = (lst: string[]) => {
-        const actTle = nom + rootUpper
-        const lineList = cpy.buzzerTemplate.toString().split('\n')
-        const gel = { actTle, root }
-        lineList.forEach((a) => {
-            const doTCompiled = doT.template(a)
-            lst.push(doTCompiled(gel))
+    // 4. Mutate buz/.buzz.ts
+    const buzzGel = { buzNom, cpyNom, balNom, nom }
+    const compiledBuzzFunction = doT.template(cpy.buzzTemplate)(buzzGel).trim()
+    buzzContent = `${buzzContent.trimEnd()}\n\n${compiledBuzzFunction}\n`
+
+    // Atomically write updated files
+    await FS.outputFile(actionFile, actionContent, 'utf8')
+    await FS.outputFile(reduceFile, reduceContent, 'utf8')
+    await FS.outputFile(buzzerFile, buzzerContent, 'utf8')
+    await FS.outputFile(buzzFile, buzzContent, 'utf8')
+
+    if (ste) {
+        await ste.hunt(ActCns.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: `>> [OK] Successfully injected ${actTle} across unit source files`,
         })
-        return { lst }
     }
 
-    const buzzBit = updateBuzz(listBuzz)
-    const buzzerBit = updateBuzzer(listBuzzer)
-    const actionUpperBit = updateActionUpper(listAction)
-    const actionLowerBit = updateActionLower(listAction)
-    const reduceBit = updateReduce(listReduce)
-
-    const merge = (a: any[], b: any[], i = 0) => {
-        return a.slice(0, i).concat(b, a.slice(i))
-    }
-
-    const resultBuzz = buzzBit.lst
-    const resultBuzzer = buzzerBit.lst.filter((e) => e.length > 2)
-    const resultReduce = merge(listReduce, reduceBit.lst, reduceBit.val)
-    let resultActionUpper = merge(
-        listAction,
-        actionUpperBit.lst,
-        actionUpperBit.val,
-    )
-    const upperActionDex = updateActionUpper(resultActionUpper).val
-    const lowerDex = actionLowerBit.val
-    let lowerActionList = listAction.slice(lowerDex, listAction.length)
-    lowerActionList.forEach((a, b) => {
-        lowerActionList[b] = a.replace(';', '')
-    })
-    lowerActionList = lowerActionList.filter((e) => e.length >= 2)
-    lowerActionList.push('| ' + nomUpper + rootUpper)
-    lowerActionList.unshift(' ')
-    resultActionUpper = resultActionUpper.slice(0, upperActionDex)
-    const resultAction = resultActionUpper.concat(lowerActionList)
-
-    await FS.writeFile(buzzFile, resultBuzz.join('\n'))
-    await FS.writeFile(buzzerFile, resultBuzzer.join('\n'))
-    await FS.writeFile(reduceFile, resultReduce.join('\n'))
-    await FS.writeFile(actionFile, resultAction.join('\n'))
-
-    // Deterministic Zero-Delay Resolution
     if (bal.slv != null) {
         bal.slv({ untBit: { idx: 'update-unit', dat: bal } })
     }
