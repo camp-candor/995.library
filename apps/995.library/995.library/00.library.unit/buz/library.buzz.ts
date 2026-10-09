@@ -908,18 +908,30 @@ export const scanFleet = async (
 ) => {
     const fs = require('fs-extra')
     const path = require('path')
-    const ActCns = require('../../83.console.unit/console.action')
+
+    const emitTelemetry = async (src: string) => {
+        if (ste && typeof ste.hunt === 'function') {
+            try {
+                const ActCns = require('../../83.console.unit/console.action')
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src,
+                })
+            } catch {
+                // Ignore telemetry dispatch errors during testing or headless runtime
+            }
+        }
+    }
 
     const fleetRoot = resolveFleetRoot()
 
     if (!fleetRoot) {
-        if (ste) {
-            await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: '>> [SCAN_FLEET_ERR] Unable to resolve fleet root boundary.',
-            })
+        if (ste && typeof ste.hunt === 'function') {
+            await emitTelemetry(
+                '>> [SCAN_FLEET_ERR] Unable to resolve fleet root boundary.',
+            )
         }
-        if (bal && bal.slv != null) {
+        if (bal && typeof bal.slv === 'function') {
             bal.slv({
                 libBit: {
                     idx: 'scan-fleet-error',
@@ -932,11 +944,8 @@ export const scanFleet = async (
         return cpy
     }
 
-    if (ste) {
-        await ste.hunt(ActCns.UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: `>> [SCAN_FLEET] Initiating fleet scan from root: ${fleetRoot}`,
-        })
+    if (ste && typeof ste.hunt === 'function') {
+        await emitTelemetry(`>> [SCAN_FLEET] Scanning fleet root: ${fleetRoot}`)
     }
 
     const IGNORED = new Set([
@@ -975,7 +984,7 @@ export const scanFleet = async (
 
             const entryPath = path.join(fleetRoot, entry.name)
 
-            // 1. Direct repository under fleetRoot
+            // 1. Direct repository directly under fleetRoot
             if (isRepo(entryPath)) {
                 reposToCheck.add(entryPath)
             }
@@ -995,13 +1004,21 @@ export const scanFleet = async (
                     }
                 }
             } catch {
-                // Ignore unreadable subfolders
+                // Ignore directory read access errors
             }
         }
 
         const fleetMap: string[] = []
         const targetPivot =
             bal && bal.src ? bal.src.replace(/[\[\]]/g, '').trim() : null
+
+        if (targetPivot) {
+            if (ste && typeof ste.hunt === 'function') {
+                await emitTelemetry(
+                    `>> [SCAN_FLEET] Target pivot filter: ${targetPivot}`,
+                )
+            }
+        }
 
         for (const repoPath of reposToCheck) {
             if (targetPivot) {
@@ -1012,35 +1029,38 @@ export const scanFleet = async (
                     const rel = path
                         .relative(fleetRoot, pkgTarget)
                         .replace(/\\/g, '/')
+                        .replace(/^\/+/, '')
                     fleetMap.push(`[${rel}]`)
                 } else if (fs.existsSync(appTarget)) {
                     const rel = path
                         .relative(fleetRoot, appTarget)
                         .replace(/\\/g, '/')
+                        .replace(/^\/+/, '')
                     fleetMap.push(`[${rel}]`)
                 }
             } else {
-                // Default: Discover all repositories housing apps/995.library harness
+                // Default: Discover repositories hosting the apps/995.library flight deck
                 const harnessTarget = path.join(repoPath, 'apps', '995.library')
                 if (fs.existsSync(harnessTarget)) {
                     const rel = path
                         .relative(fleetRoot, harnessTarget)
                         .replace(/\\/g, '/')
+                        .replace(/^\/+/, '')
                     fleetMap.push(`[${rel}]`)
                 }
             }
         }
 
+        // Deterministic alphabetical sorting for Blessed UI menus
         fleetMap.sort((a, b) => a.localeCompare(b))
 
-        if (ste) {
-            await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: `>> [SCAN_FLEET_OK] Discovered ${fleetMap.length} targets across fleet.`,
-            })
+        if (ste && typeof ste.hunt === 'function') {
+            await emitTelemetry(
+                `>> [SCAN_FLEET_OK] Discovered ${fleetMap.length} target(s) across fleet.`,
+            )
         }
 
-        if (bal && bal.slv != null) {
+        if (bal && typeof bal.slv === 'function') {
             bal.slv({
                 libBit: {
                     idx: 'scan-fleet',
@@ -1051,17 +1071,16 @@ export const scanFleet = async (
             })
         }
     } catch (err: any) {
-        if (ste) {
-            await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: `>> [SCAN_FLEET_ERR] Scan failure: ${err.message}`,
-            })
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        if (ste && typeof ste.hunt === 'function') {
+            await emitTelemetry(`>> [SCAN_FLEET_ERR] Scan failure: ${errorMsg}`)
         }
-        if (bal && bal.slv != null) {
+
+        if (bal && typeof bal.slv === 'function') {
             bal.slv({
                 libBit: {
                     idx: 'scan-fleet-error',
-                    src: err.message,
+                    src: errorMsg,
                     lst: [],
                     val: -1,
                 },

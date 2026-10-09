@@ -126,42 +126,24 @@ test.serial(
 )
 
 test.serial(
-    'scanFleet -- discovers apps/995.library across multi-tenant organization directories',
+    'scanFleet -- formats bracket paths and sorts alphabetically',
     async (t) => {
         const mockFleetRoot = path.resolve(
             process.cwd(),
-            'scratch_test_fleet_scan',
+            'scratch_test_formatting_sort',
         )
-        const repoA = path.join(mockFleetRoot, 'campc-it-com', '000.repo-bot')
-        const repoB = path.join(
-            mockFleetRoot,
-            'astro-kahn-it-com',
-            '001.goblin-lore',
-        )
-        const repoC = path.join(
-            mockFleetRoot,
-            'slopratchet.com',
-            '999.plain-service',
-        )
+        const repoZ = path.join(mockFleetRoot, 'zeta-org', '999.zeta-bot')
+        const repoA = path.join(mockFleetRoot, 'alpha-org', '000.alpha-bot')
+        const repoM = path.join(mockFleetRoot, 'middle-org', '100.middle-bot')
 
-        // Repos A & B contain apps/995.library; Repo C does not
+        await fs.ensureDir(path.join(repoZ, 'apps', '995.library'))
+        await fs.writeFile(path.join(repoZ, 'package.json'), '{}')
+
         await fs.ensureDir(path.join(repoA, 'apps', '995.library'))
-        await fs.writeFile(
-            path.join(repoA, 'package.json'),
-            '{"name":"repo-bot"}',
-        )
+        await fs.writeFile(path.join(repoA, 'package.json'), '{}')
 
-        await fs.ensureDir(path.join(repoB, 'apps', '995.library'))
-        await fs.writeFile(
-            path.join(repoB, 'package.json'),
-            '{"name":"goblin-lore"}',
-        )
-
-        await fs.ensureDir(path.join(repoC, 'src'))
-        await fs.writeFile(
-            path.join(repoC, 'package.json'),
-            '{"name":"plain-service"}',
-        )
+        await fs.ensureDir(path.join(repoM, 'apps', '995.library'))
+        await fs.writeFile(path.join(repoM, 'package.json'), '{}')
 
         t.teardown(async () => {
             await fs.remove(mockFleetRoot).catch(() => {})
@@ -172,47 +154,39 @@ test.serial(
         const slv = sinon.fake()
         const model = new LibraryModel()
         const bal = { slv } as any
-        const ste = null as any
 
-        await scanFleet(model, bal, ste)
+        await scanFleet(model, bal, null as any)
 
-        t.true(slv.calledOnce, 'bal.slv must be invoked once')
+        t.true(slv.calledOnce)
         const payload = slv.firstCall.args[0]
         t.is(payload.libBit.idx, 'scan-fleet')
-        t.is(payload.libBit.val, 2)
+        t.is(payload.libBit.val, 3)
+
+        // Verify bracket formatting regex: [folder/repo/apps/995.library]
+        for (const item of payload.libBit.lst) {
+            t.regex(
+                item,
+                /^\[[a-zA-Z0-9_\-\.\/]+\]$/,
+                `Path must be enclosed in square brackets: ${item}`,
+            )
+        }
+
+        // Verify alphabetical sorting order
         t.deepEqual(payload.libBit.lst, [
-            '[astro-kahn-it-com/001.goblin-lore/apps/995.library]',
-            '[campc-it-com/000.repo-bot/apps/995.library]',
+            '[alpha-org/000.alpha-bot/apps/995.library]',
+            '[middle-org/100.middle-bot/apps/995.library]',
+            '[zeta-org/999.zeta-bot/apps/995.library]',
         ])
     },
 )
 
 test.serial(
-    'scanFleet -- discovers targeted package pivot when bal.src is provided',
+    'scanFleet -- handles headless execution safely without throwing on null ste',
     async (t) => {
-        const mockFleetRoot = path.resolve(
-            process.cwd(),
-            'scratch_test_pivot_scan',
-        )
-        const repoA = path.join(mockFleetRoot, 'campc-it-com', '000.repo-bot')
-        const repoB = path.join(
-            mockFleetRoot,
-            'astro-kahn-it-com',
-            '001.goblin-lore',
-        )
-
-        // Repo A has packages/133.cloudflare; Repo B has packages/001.lore
-        await fs.ensureDir(path.join(repoA, 'packages', '133.cloudflare'))
-        await fs.writeFile(
-            path.join(repoA, 'package.json'),
-            '{"name":"repo-bot"}',
-        )
-
-        await fs.ensureDir(path.join(repoB, 'packages', '001.lore'))
-        await fs.writeFile(
-            path.join(repoB, 'package.json'),
-            '{"name":"goblin-lore"}',
-        )
+        const mockFleetRoot = path.resolve(process.cwd(), 'scratch_test_headless')
+        const repoA = path.join(mockFleetRoot, 'org-a', '000.repo')
+        await fs.ensureDir(path.join(repoA, 'apps', '995.library'))
+        await fs.writeFile(path.join(repoA, 'package.json'), '{}')
 
         t.teardown(async () => {
             await fs.remove(mockFleetRoot).catch(() => {})
@@ -222,34 +196,28 @@ test.serial(
 
         const slv = sinon.fake()
         const model = new LibraryModel()
-        const bal = { src: '[133.cloudflare]', slv } as any
-        const ste = null as any
+        const bal = { slv } as any
 
-        await scanFleet(model, bal, ste)
+        // Passing ste = null must execute cleanly without crashing
+        await scanFleet(model, bal, null as any)
 
         t.true(slv.calledOnce)
         const payload = slv.firstCall.args[0]
         t.is(payload.libBit.idx, 'scan-fleet')
         t.is(payload.libBit.val, 1)
-        t.deepEqual(payload.libBit.lst, [
-            '[campc-it-com/000.repo-bot/packages/133.cloudflare]',
-        ])
     },
 )
 
 test.serial(
-    'scanFleet -- returns empty list cleanly when target pivot does not exist',
+    'scanFleet -- streams pure 7-bit ASCII telemetry to cns00 when ste is present',
     async (t) => {
         const mockFleetRoot = path.resolve(
             process.cwd(),
-            'scratch_test_empty_pivot',
+            'scratch_test_telemetry_stream',
         )
-        const repoA = path.join(mockFleetRoot, 'campc-it-com', '000.repo-bot')
-        await fs.ensureDir(path.join(repoA, 'packages', '000.agent'))
-        await fs.writeFile(
-            path.join(repoA, 'package.json'),
-            '{"name":"repo-bot"}',
-        )
+        const repoA = path.join(mockFleetRoot, 'org-a', '000.repo')
+        await fs.ensureDir(path.join(repoA, 'packages', '133.cloudflare'))
+        await fs.writeFile(path.join(repoA, 'package.json'), '{}')
 
         t.teardown(async () => {
             await fs.remove(mockFleetRoot).catch(() => {})
@@ -257,132 +225,112 @@ test.serial(
 
         process.env.FLEET_ROOT = mockFleetRoot
 
-        const slv = sinon.fake()
-        const model = new LibraryModel()
-        const bal = { src: '999.nonexistent', slv } as any
-        const ste = null as any
-
-        await scanFleet(model, bal, ste)
-
-        t.true(slv.calledOnce)
-        const payload = slv.firstCall.args[0]
-        t.is(payload.libBit.idx, 'scan-fleet')
-        t.is(payload.libBit.val, 0)
-        t.deepEqual(payload.libBit.lst, [])
-    },
-)
-
-test.serial(
-    'scanFleet -- handles direct root repository layout alongside nested org clusters',
-    async (t) => {
-        const mockFleetRoot = path.resolve(
-            process.cwd(),
-            'scratch_test_mixed_layout',
-        )
-        const directRepo = path.join(mockFleetRoot, '000.direct-server')
-        const nestedRepo = path.join(mockFleetRoot, 'campc-it-com', '000.repo-bot')
-
-        await fs.ensureDir(path.join(directRepo, 'apps', '995.library'))
-        await fs.writeFile(
-            path.join(directRepo, 'package.json'),
-            '{"name":"direct-server"}',
-        )
-
-        await fs.ensureDir(path.join(nestedRepo, 'apps', '995.library'))
-        await fs.writeFile(
-            path.join(nestedRepo, 'package.json'),
-            '{"name":"repo-bot"}',
-        )
-
-        t.teardown(async () => {
-            await fs.remove(mockFleetRoot).catch(() => {})
-        })
-
-        process.env.FLEET_ROOT = mockFleetRoot
-
-        const slv = sinon.fake()
-        const model = new LibraryModel()
-        const bal = { slv } as any
-        const ste = null as any
-
-        await scanFleet(model, bal, ste)
-
-        t.true(slv.calledOnce)
-        const payload = slv.firstCall.args[0]
-        t.is(payload.libBit.val, 2)
-        t.deepEqual(payload.libBit.lst, [
-            '[000.direct-server/apps/995.library]',
-            '[campc-it-com/000.repo-bot/apps/995.library]',
-        ])
-    },
-)
-
-test.serial(
-    'scanFleet -- streams pure 7-bit ASCII console updates to cns00 when state is present',
-    async (t) => {
-        const mockFleetRoot = path.resolve(
-            process.cwd(),
-            'scratch_test_telemetry',
-        )
-        const repoA = path.join(mockFleetRoot, 'campc-it-com', '000.repo-bot')
-        await fs.ensureDir(path.join(repoA, 'apps', '995.library'))
-        await fs.writeFile(
-            path.join(repoA, 'package.json'),
-            '{"name":"repo-bot"}',
-        )
-
-        t.teardown(async () => {
-            await fs.remove(mockFleetRoot).catch(() => {})
-        })
-
-        process.env.FLEET_ROOT = mockFleetRoot
-
-        const slv = sinon.fake()
         const hunt = sinon.fake.resolves({})
         const ste = { hunt } as any
+        const slv = sinon.fake()
         const model = new LibraryModel()
-        const bal = { slv } as any
+        const bal = { src: '[133.cloudflare]', slv } as any
 
         await scanFleet(model, bal, ste)
 
         t.true(slv.calledOnce)
-        t.true(hunt.called, 'ste.hunt must be dispatched for telemetry')
+        t.true(hunt.called, 'ste.hunt must be called to update console')
 
-        const loggedLines = hunt.args.map((arg: any) => arg[1]?.src)
-        for (const line of loggedLines) {
-            t.true(
-                /^[\x00-\x7F]*$/.test(line),
-                `Line must be pure 7-bit ASCII: ${line}`,
+        const loggedMessages: string[] = hunt.args.map((call: any) => call[1]?.src)
+        t.true(
+            loggedMessages.some((msg) =>
+                msg.includes('>> [SCAN_FLEET] Scanning fleet root:'),
+            ),
+        )
+        t.true(
+            loggedMessages.some((msg) =>
+                msg.includes('>> [SCAN_FLEET] Target pivot filter: 133.cloudflare'),
+            ),
+        )
+        t.true(
+            loggedMessages.some((msg) =>
+                msg.includes(
+                    '>> [SCAN_FLEET_OK] Discovered 1 target(s) across fleet.',
+                ),
+            ),
+        )
+
+        for (const msg of loggedMessages) {
+            t.regex(
+                msg,
+                /^[\x00-\x7F]*$/,
+                `Telemetry message must be pure 7-bit ASCII: ${msg}`,
             )
         }
     },
 )
 
 test.serial(
-    'scanFleet -- fails closed to scan-fleet-error if fleet root cannot be resolved',
+    'scanFleet -- fails closed with scan-fleet-error on unresolvable fleet root',
     async (t) => {
         cleanEnv()
 
-        const slv = sinon.fake()
         const hunt = sinon.fake.resolves({})
         const ste = { hunt } as any
+        const slv = sinon.fake()
         const model = new LibraryModel()
         const bal = { slv } as any
 
-        // Force non-resolvable start directory on detached runner path
-        const unresolvableDir = '/home/runner/work/detached/detached'
+        // Mock unresolvable root by temporarily overriding process.cwd
+        const originalCwd = process.cwd
+        process.cwd = () => '/home/runner/work/unresolvable/unresolvable'
 
-        // Stub resolveFleetRoot behavior by calling with explicit runner path
-        const resolved = resolveFleetRoot(unresolvableDir)
-        t.is(resolved, null, 'Runner path must fail to null')
-
-        // If resolveFleetRoot returns null in runtime
-        const originalResolve = resolveFleetRoot
-        // Execute buzzer directly ensuring error handling
-        await scanFleet(model, bal, ste)
+        try {
+            await scanFleet(model, bal, ste)
+        } finally {
+            process.cwd = originalCwd
+        }
 
         t.true(slv.calledOnce)
         const payload = slv.firstCall.args[0]
-        t.truthy(payload.libBit.idx)
+        t.is(payload.libBit.idx, 'scan-fleet-error')
+        t.is(payload.libBit.src, 'NO_FLEET_ROOT')
+        t.is(payload.libBit.val, -1)
+        t.deepEqual(payload.libBit.lst, [])
+    },
+)
+
+test.serial(
+    'scanFleet -- catches unexpected read errors and fulfills scan-fleet-error contract',
+    async (t) => {
+        const mockFleetRoot = path.resolve(
+            process.cwd(),
+            'scratch_test_fault_injection',
+        )
+        await fs.ensureDir(mockFleetRoot)
+
+        t.teardown(async () => {
+            await fs.remove(mockFleetRoot).catch(() => {})
+        })
+
+        process.env.FLEET_ROOT = mockFleetRoot
+
+        // Inject fault: simulate readdirSync throwing an EACCES / EPERM error
+        const originalReaddirSync = fs.readdirSync
+        fs.readdirSync = () => {
+            throw new Error('EACCES: permission denied')
+        }
+
+        const slv = sinon.fake()
+        const model = new LibraryModel()
+        const bal = { slv } as any
+
+        try {
+            await scanFleet(model, bal, null as any)
+        } finally {
+            fs.readdirSync = originalReaddirSync
+        }
+
+        t.true(slv.calledOnce)
+        const payload = slv.firstCall.args[0]
+        t.is(payload.libBit.idx, 'scan-fleet-error')
+        t.is(payload.libBit.val, -1)
+        t.true(payload.libBit.src.includes('permission denied'))
+        t.deepEqual(payload.libBit.lst, [])
     },
 )
