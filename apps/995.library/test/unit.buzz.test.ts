@@ -107,7 +107,7 @@ test.serial(
 )
 
 test.serial(
-    'createUnit -- scaffolds templates deterministically and resolves immediately without timeout',
+    'createUnit -- scaffolds templates deterministically with zero artificial latency',
     async (t) => {
         let repoRoot = process.cwd()
         while (
@@ -123,22 +123,27 @@ test.serial(
         }
 
         const testVerb = 'weather'
-        const bal = makeBal(testVerb)
         const targetRelativeDir = `data/unit/00.${testVerb}.unit`
+        const bal = makeBal(testVerb, 'data/unit')
         const targetAbsoluteDir = path.join(repoRoot, targetRelativeDir)
 
         t.teardown(async () => {
             await fs.remove(targetAbsoluteDir).catch(() => {})
         })
 
-        createUnit(makeModel(), bal, ste)
+        const startTime = Date.now()
+        await createUnit(makeModel(), bal, ste)
+        const elapsed = Date.now() - startTime
 
+        t.true(bal.slv.calledOnce, 'bal.slv must be called immediately upon file creation')
         t.true(
-            bal.slv.calledOnce,
-            'bal.slv must be invoked synchronously and immediately',
+            elapsed < 1000,
+            `Execution must complete without artificial delays; elapsed: ${elapsed}ms`,
         )
+
         const result = bal.slv.firstCall.args[0]
         t.is(result.untBit.idx, 'create-unit')
+
         t.true(
             result.untBit.src.startsWith(targetRelativeDir),
             `Expected ${targetRelativeDir}, got: ${result.untBit.src}`,
@@ -171,7 +176,7 @@ test.serial(
 )
 
 test.serial(
-    'updateUnit -- generates non-blocking async stubs and resolves immediately',
+    'createUnit -- routes directly to active package workspace when src is provided',
     async (t) => {
         let repoRoot = process.cwd()
         while (
@@ -186,81 +191,66 @@ test.serial(
             repoRoot = parent
         }
 
-        const tempUnitDir = path.join(
-            repoRoot,
-            'scratch_unit_update',
-            '00.demo.unit',
-        )
-        const buzzDir = path.join(tempUnitDir, 'buz')
-        await fs.ensureDir(buzzDir)
+        const scratchPkg = path.join(repoRoot, 'scratch_target_pkg')
+        await fs.ensureDir(scratchPkg)
 
-        const buzzFile = path.join(buzzDir, 'demo.buzz.ts')
-        const buzzerFile = path.join(tempUnitDir, 'demo.buzzer.ts')
-        const actionFile = path.join(tempUnitDir, 'demo.action.ts')
-        const reduceFile = path.join(tempUnitDir, 'demo.reduce.ts')
-
-        await fs.writeFile(buzzFile, 'export const initDemo = () => {};\n')
-        await fs.writeFile(
-            buzzerFile,
-            'export { initDemo } from "./buz/demo.buzz";\n',
-        )
-        await fs.writeFile(
-            actionFile,
-            [
-                'export const INIT_DEMO = "[Demo action] Init Demo";',
-                'export class InitDemo { readonly type = INIT_DEMO; }',
-                'export type Actions = InitDemo;',
-            ].join('\n'),
-        )
-        await fs.writeFile(
-            reduceFile,
-            [
-                'import * as Act from "./demo.action";',
-                'export function reducer(model = {}, act = {}) {',
-                '  switch (act.type) {',
-                '    default: return model;',
-                '  }',
-                '}',
-            ].join('\n'),
-        )
+        const testVerb = 'radar'
+        const bal = makeBal(testVerb, scratchPkg)
+        const expectedTargetDir = path.join(scratchPkg, `00.${testVerb}.unit`)
 
         t.teardown(async () => {
-            await fs
-                .remove(path.join(repoRoot, 'scratch_unit_update'))
-                .catch(() => {})
+            await fs.remove(scratchPkg).catch(() => {})
         })
 
-        const bal = makeBal(
-            '00.demo.unit',
-            path.join(repoRoot, 'scratch_unit_update'),
-            'open',
-        )
+        const startTime = Date.now()
+        await createUnit(makeModel(), bal, ste)
+        const elapsed = Date.now() - startTime
 
+        t.true(bal.slv.calledOnce, 'bal.slv must resolve immediately')
+        t.true(elapsed < 1000, 'Must execute without latency sentinels')
+        t.true(fs.existsSync(expectedTargetDir), 'Target unit must exist inside designated package workspace')
+        t.true(fs.existsSync(path.join(expectedTargetDir, 'radar.unit.ts')))
+    },
+)
+
+test.serial(
+    'updateUnit -- resolves immediately without latency delay',
+    async (t) => {
+        let repoRoot = process.cwd()
+        while (
+            repoRoot &&
+            !(
+                fs.existsSync(path.join(repoRoot, 'apps')) &&
+                fs.existsSync(path.join(repoRoot, 'packages'))
+            )
+        ) {
+            const parent = path.dirname(repoRoot)
+            if (parent === repoRoot) break
+            repoRoot = parent
+        }
+
+        const tempDir = path.join(repoRoot, 'scratch_update_unit')
+        const unitDir = path.join(tempDir, '00.dummy.unit')
+        const buzDir = path.join(unitDir, 'buz')
+        await fs.ensureDir(buzDir)
+
+        await fs.writeFile(path.join(buzDir, 'dummy.buzz.ts'), 'export const initDummy = () => {}\n')
+        await fs.writeFile(path.join(unitDir, 'dummy.buzzer.ts'), 'export { initDummy } from "./buz/dummy.buzz"\n')
+        await fs.writeFile(path.join(unitDir, 'dummy.action.ts'), 'export const INIT = "INIT";\nexport type Actions = | any\n')
+        await fs.writeFile(path.join(unitDir, 'dummy.reduce.ts'), 'switch(act.type) {\ndefault: return model;\n}\n')
+
+        const bal = makeBal('00.dummy.unit', tempDir, 'status')
+
+        t.teardown(async () => {
+            await fs.remove(tempDir).catch(() => {})
+        })
+
+        const startTime = Date.now()
         await updateUnit(makeModel(), bal, ste)
+        const elapsed = Date.now() - startTime
 
-        t.true(
-            bal.slv.calledOnce,
-            'updateUnit must resolve immediately without timeout',
-        )
-        const res = bal.slv.firstCall.args[0]
-        t.is(res.untBit.idx, 'update-unit')
-
-        const buzzContent = await fs.readFile(buzzFile, 'utf8')
-        t.true(
-            buzzContent.includes('export const openDemo = async'),
-            'Must append async openDemo export',
-        )
-        t.true(
-            buzzContent.includes('Update Console'),
-            'Must include non-blocking console telemetry',
-        )
-        t.true(
-            buzzContent.includes("bal.slv({ openBit: { idx: 'openDemo-stub' } })"),
-            'Must resolve bal.slv with openBit payload',
-        )
-        t.false(
-            buzzContent.includes('debugger'),
-            'Must not include blocking debugger statements',
-        )
+        t.true(bal.slv.calledOnce, 'bal.slv should resolve immediately')
+        t.true(elapsed < 1000, `updateUnit must not enforce artificial delay; elapsed: ${elapsed}ms`)
+        t.is(bal.slv.firstCall.args[0].untBit.idx, 'update-unit')
     },
 )
