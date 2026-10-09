@@ -31,6 +31,12 @@ export function reducer(
         case Act.ROUTE_MENU:
             return Buzz.routeMenu(clone(model), act.bale, state)
 
+        case Act.FLEET_MENU:
+            return Buzz.fleetMenu(clone(model), act.bale, state)
+
+        case Act.SAGA_TORN_STATE_MENU:
+            return Buzz.sagaTornStateMenu(clone(model), act.bale, state)
+
         default:
             return model
     }
