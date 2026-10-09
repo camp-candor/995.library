@@ -16,3 +16,4 @@ export { scanFleet } from './buz/library.buzz';
 export { writeSagaJournal } from './buz/library.buzz';
 export { rollbackSagaJournal } from './buz/library.buzz';
 export { finalizeSagaJournal } from './buz/library.buzz';
+export { auditLibrary } from './buz/library.buzz';

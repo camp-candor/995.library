@@ -63,6 +63,12 @@ export class ProgressLibrarySaga implements Action {
     constructor(public bale: LibraryBit) {}
 }
 
+export const AUDIT_LIBRARY = '[Audit action] Audit Library'
+export class AuditLibrary implements Action {
+    readonly type = AUDIT_LIBRARY
+    constructor(public bale?: LibraryBit) {}
+}
+
 export type Actions =
     | CheckGitWorkingTree
     | ProgressLibrarySaga
@@ -74,4 +80,5 @@ export type Actions =
     | ScanFleet
     | LaunchLibrary
     | FlatLibrary
+    | AuditLibrary
 
