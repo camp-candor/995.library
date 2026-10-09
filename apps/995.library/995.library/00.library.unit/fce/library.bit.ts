@@ -3,5 +3,6 @@ export default interface LibraryBit {
     src?: string
     val?: number
     dat?: any
+    lst?: any
     slv?: Function
 }
