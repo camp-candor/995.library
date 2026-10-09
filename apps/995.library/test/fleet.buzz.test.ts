@@ -1,11 +1,16 @@
-import test from 'ava'
 import path from 'path'
 import fs from 'fs-extra'
-import sinon from 'sinon'
 import { LibraryModel } from '../995.library/00.library.unit/library.model'
+import { promisify } from 'util'
+import { execFile } from 'child_process'
+import test from 'ava'
+import sinon from 'sinon'
 import {
     resolveFleetRoot,
     scanFleet,
+    checkGitWorkingTree,
+    resolveGitRoot,
+    progressLibrarySaga,
 } from '../995.library/00.library.unit/buz/library.buzz'
 
 const cleanEnv = () => {
@@ -519,4 +524,98 @@ test.serial('scanFleet [NEG_CONTROL] -- catches unexpected read errors and fulfi
     t.is(payload.libBit.val, -1)
     t.true(payload.libBit.src.includes('permission denied'))
     t.deepEqual(payload.libBit.lst, [])
+})
+
+
+
+
+
+test.serial('Pre-Flight Guard: resolveGitRoot finds active git anchor', async (t) => {
+    const gitRoot = await resolveGitRoot(process.cwd())
+    t.truthy(gitRoot)
+    t.true(await fs.pathExists(path.join(gitRoot!, '.git')))
+})
+
+test.serial('Pre-Flight Guard: returns clean on unmolested target directory', async (t) => {
+    const gitRoot = (await resolveGitRoot(process.cwd()))!
+    const sandboxDir = path.join(gitRoot, 'test_clean_test')
+    await fs.ensureDir(sandboxDir)
+
+    t.teardown(async () => {
+        await fs.remove(sandboxDir).catch(() => {})
+    })
+
+    const status = await checkGitWorkingTree(sandboxDir)
+    t.true(status.clean)
+    t.is(status.intersectingFiles.length, 0)
+})
+
+test.serial('Pre-Flight Guard: detects untracked file inside target directory', async (t) => {
+    const gitRoot = (await resolveGitRoot(process.cwd()))!
+    const targetDir = path.join(gitRoot, 'test_dirty_target_real')
+    const untrackedFile = path.join(targetDir, 'probe.ts')
+
+    await fs.ensureDir(targetDir)
+    await fs.writeFile(untrackedFile, '// Probe data')
+
+
+    t.teardown(async () => {
+        await fs.remove(targetDir).catch(() => {})
+    })
+
+    const status = await checkGitWorkingTree(targetDir)
+    t.false(status.clean)
+    t.true(status.intersectingFiles.length > 0)
+    t.true(status.intersectingFiles.some((f) => f.includes('test_dirty_target_real')))
+})
+
+test.serial('Pre-Flight Guard: ignores dirty files residing outside target directory', async (t) => {
+    const gitRoot = (await resolveGitRoot(process.cwd()))!
+    const isolatedTargetDir = path.join(gitRoot, 'test_isolated_target')
+    const externalDirtyDir = path.join(gitRoot, 'test_external_dirty')
+    const externalFile = path.join(externalDirtyDir, 'untracked.ts')
+
+    await fs.ensureDir(isolatedTargetDir)
+    await fs.ensureDir(externalDirtyDir)
+    await fs.writeFile(externalFile, '// External file')
+
+    t.teardown(async () => {
+        await fs.remove(isolatedTargetDir).catch(() => {})
+        await fs.remove(externalDirtyDir).catch(() => {})
+    })
+
+    const status = await checkGitWorkingTree(isolatedTargetDir)
+    t.true(status.clean, 'Target must remain clean despite sibling dirty files')
+    t.is(status.intersectingFiles.length, 0)
+})
+
+test.serial('progressLibrarySaga: aborts before staging when target tree is dirty', async (t) => {
+    const gitRoot = (await resolveGitRoot(process.cwd()))!
+    const dirtyTarget = path.join(gitRoot, 'test_saga_dirty_target_real')
+    const dirtyFile = path.join(dirtyTarget, 'agent.ts')
+
+    await fs.ensureDir(dirtyTarget)
+    await fs.writeFile(dirtyFile, '// Important unsaved work')
+
+    t.teardown(async () => {
+        await fs.remove(dirtyTarget).catch(() => {})
+    })
+
+    let resolvedResult: any = null
+    const bal = {
+        src: dirtyTarget,
+        slv: (res: any) => {
+            resolvedResult = res
+        },
+    }
+
+    await progressLibrarySaga(new LibraryModel(), bal as any, null as any)
+
+    t.truthy(resolvedResult)
+    t.is(resolvedResult.libBit.idx, 'progress-library-saga-error')
+    t.true(resolvedResult.libBit.dat.targetsFailed[0].includes('DIRTY_WORKING_TREE'))
+
+    // Assert existing dirty work was strictly preserved and not overwritten
+    const preservedContent = await fs.readFile(dirtyFile, 'utf8')
+    t.is(preservedContent, '// Important unsaved work')
 })
