@@ -152,242 +152,250 @@ export const updateLibrary = async (
     bal: LibraryBit,
     ste: State,
 ) => {
-    const FS = require('fs-extra')
+    const fs = require('fs-extra')
     const doT = require('dot')
-    const S = require('string')
     const path = require('path')
 
-    let title = '995.library'
+    const capitalize = (s: string) =>
+        s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s
 
-    title = bal.src
-    if (title) title = title.replace(/[\[\]]/g, '')
-
-    function capitalizeFirstLetter(string) {
-        return string.charAt(0).toUpperCase() + string.slice(1)
-    }
-
-    const isRepoRoot = (dir: string) => {
+    const isRepoRoot = (dir: string): boolean => {
         try {
             return (
-                FS.existsSync(path.join(dir, 'apps')) &&
-                FS.existsSync(path.join(dir, 'packages')) &&
-                FS.existsSync(path.join(dir, 'package.json'))
+                fs.existsSync(path.join(dir, 'apps')) &&
+                fs.existsSync(path.join(dir, 'packages')) &&
+                fs.existsSync(path.join(dir, 'package.json'))
             )
         } catch {
             return false
         }
     }
 
-    let repoRoot = process.cwd()
-    while (repoRoot && !isRepoRoot(repoRoot)) {
-        const parent = path.dirname(repoRoot)
-        if (parent === repoRoot) break
-        repoRoot = parent
-    }
+    try {
+        // 1. Resolve repository root
+        let repoRoot = process.cwd()
+        while (repoRoot && !isRepoRoot(repoRoot)) {
+            const parent = path.dirname(repoRoot)
+            if (parent === repoRoot) break
+            repoRoot = parent
+        }
 
-    let targetDir = path.resolve(title)
-    if (!FS.existsSync(targetDir) && isRepoRoot(repoRoot)) {
-        const rootTarget = path.resolve(repoRoot, title)
-        if (FS.existsSync(rootTarget)) {
-            targetDir = rootTarget
-        } else {
-            const pkgTarget = path.resolve(repoRoot, 'packages', title)
-            if (FS.existsSync(pkgTarget)) {
-                targetDir = pkgTarget
-            } else {
-                const appTarget = path.resolve(repoRoot, 'apps', title)
-                if (FS.existsSync(appTarget)) {
-                    targetDir = appTarget
+        if (!isRepoRoot(repoRoot)) {
+            let dir = typeof __dirname !== 'undefined' ? __dirname : process.cwd()
+            while (dir && dir !== path.dirname(dir)) {
+                if (isRepoRoot(dir)) {
+                    repoRoot = dir
+                    break
                 }
+                dir = path.dirname(dir)
             }
         }
-    }
 
-    let file = path.resolve(process.cwd(), './data/redux/BEE.txt')
-    if (!FS.existsSync(file) && isRepoRoot(repoRoot)) {
-        file = path.resolve(repoRoot, 'apps/995.library/data/redux/BEE.txt')
-    }
+        // 2. Resolve clean target workspace
+        const rawTarget = (bal?.src || 'apps/995.library/995.library')
+            .replace(/[\[\]]/g, '')
+            .trim()
 
-    let fileFin = path.resolve(process.cwd(), './data/redux/BEE.ts')
-    if (!FS.existsSync(path.dirname(fileFin)) && isRepoRoot(repoRoot)) {
-        fileFin = path.resolve(repoRoot, 'apps/995.library/data/redux/BEE.ts')
-    }
+        let targetDir = path.resolve(repoRoot, rawTarget)
+        if (!fs.existsSync(targetDir)) {
+            const candidatePkg = path.resolve(repoRoot, 'packages', rawTarget)
+            const candidateApp = path.resolve(repoRoot, 'apps', rawTarget)
+            if (fs.existsSync(candidatePkg)) {
+                targetDir = candidatePkg
+            } else if (fs.existsSync(candidateApp)) {
+                targetDir = candidateApp
+            } else {
+                const errMsg = `Target directory not found: ${rawTarget}`
+                if (ste) {
+                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [RE-WIRE ERROR] ${errMsg}`,
+                    })
+                }
+                if (bal?.slv != null) {
+                    bal.slv({
+                        libBit: {
+                            idx: 'update-library-err',
+                            dat: errMsg,
+                        },
+                    })
+                }
+                return cpy
+            }
+        }
 
-    if (!FS.existsSync(targetDir)) {
-        await ste.hunt(ActCns.UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: 'Error: Target directory not found: ' + targetDir,
-        })
-        if (bal.slv != null)
-            bal.slv({
-                libBit: {
-                    idx: 'update-library-err',
-                    dat: 'Directory not found: ' + targetDir,
-                },
+        const relativeDisplay = path.relative(repoRoot, targetDir).replace(/\\/g, '/')
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [UPDATE] Compiling manifest for: [${relativeDisplay}]`,
             })
-        return cpy
-    }
+        }
 
-    if (!FS.existsSync(file)) {
-        await ste.hunt(ActCns.UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: 'Error: Template BEE.txt not found at: ' + file,
-        })
-        if (bal.slv != null)
-            bal.slv({
-                libBit: {
-                    idx: 'update-library-err',
-                    dat: 'BEE.txt not found',
-                },
-            })
-        return cpy
-    }
+        // 3. Resolve template BEE.txt
+        const templateCandidates = [
+            path.resolve(repoRoot, 'apps/995.library/data/redux/BEE.txt'),
+            path.resolve(process.cwd(), './data/redux/BEE.txt'),
+            path.resolve(targetDir, 'BEE.txt'),
+        ]
 
-    const list = FS.readdirSync(targetDir)
-    const lineList = FS.readFileSync(file).toString().split('\n')
+        let templatePath: string | null = null
+        for (const candidate of templateCandidates) {
+            if (fs.existsSync(candidate)) {
+                templatePath = candidate
+                break
+            }
+        }
 
-    const out = []
-    const dirList = []
+        const defaultTemplate = [
+            'import Model from "./99.core/interface/model.interface";',
+            '',
+            '{{=it.unitImports}}',
+            '',
+            '{{=it.faceImports}}',
+            '',
+            'export const list: Array< any > = {{=it.unitList}}',
+            '',
+            '{{=it.reduceImports}}',
+            '',
+            'export const reducer: any = {',
+            ' {{=it.reduceList}}',
+            '};',
+            '',
+            'export default class UnitData implements Model {',
+            ' {{=it.modelList}}',
+            '}',
+        ].join('\n')
 
-    const itemList = []
+        const rawTemplate = templatePath
+            ? fs.readFileSync(templatePath, 'utf8')
+            : defaultTemplate
 
-    list.forEach(async (a, b) => {
-        const checkPath = path.join(targetDir, a)
+        // 4. Deterministic Unit Discovery
+        const entries = fs.readdirSync(targetDir, { withFileTypes: true })
+        const unitFolders = entries
+            .filter(
+                (entry: any) =>
+                    entry.isDirectory() && /^\d{2}\..+\.unit$/.test(entry.name),
+            )
+            .map((entry: any) => entry.name)
+            .sort((a: string, b: string) => a.localeCompare(b))
 
-        if (FS.lstatSync(checkPath).isDirectory()) {
-            if (S(checkPath).contains('unit') == false) return
+        if (unitFolders.length === 0) {
+            const warningMsg = `No .unit packages detected in ${relativeDisplay}`
+            if (ste) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [UPDATE] [WARN] ${warningMsg}`,
+                })
+            }
+        }
 
-            const directory = checkPath + '/'
-            const element = a.split('.')[1]
+        const items: Array<{
+            unitName: string
+            element: string
+            unitImport: string
+            faceImport: string
+            modlImport: string
+            redcImport: string
+            reduced: string
+            model: string
+        }> = []
 
-            const unitName = capitalizeFirstLetter(element)
+        for (const folder of unitFolders) {
+            const parts = folder.split('.')
+            const element = parts.slice(1, -1).join('.') || parts[1] || folder
+            const unitName = capitalize(element)
             const faceTypeName =
                 unitName === 'Model' ? 'ModelInterface' : unitName
 
-            const unitImportSrc = './' + a + '/' + element + '.unit'
-            const unitImportSte =
-                'import ' + unitName + 'Unit from "' + unitImportSrc + '";'
+            const unitImport = `import ${unitName}Unit from "./${folder}/${element}.unit";`
+            const faceImport = `import ${faceTypeName} from "./${folder}/fce/${element}.interface";`
+            const modlImport = `import { ${unitName}Model } from "./${folder}/${element}.model";`
+            const redcImport = `import * as reduceFrom${unitName} from "./${folder}/${element}.reduce";`
 
-            const faceImportSrc = './' + a + '/fce/' + element + '.interface'
-            const faceImportSte =
-                'import ' + faceTypeName + ' from "' + faceImportSrc + '";'
+            const reduced = `${element}: reduceFrom${unitName}.reducer,`
+            const model = `${element}: ${faceTypeName} = new ${unitName}Model();`
 
-            const modlImportSrc = './' + a + '/' + element + '.model'
-            const modlImportSte =
-                'import { ' + unitName + 'Model } from "' + modlImportSrc + '";'
-
-            const redcImportSrc = './' + a + '/' + element + '.reduce'
-            const redcImportSte =
-                'import * as reduceFrom' +
-                unitName +
-                ' from "' +
-                redcImportSrc +
-                '";'
-
-            const reduced = element + ' : reduceFrom' + unitName + '.reducer'
-            const model =
-                element +
-                ' : ' +
-                faceTypeName +
-                ' = new ' +
-                unitName +
-                'Model();'
-
-            const item = {
-                model,
-                reduced,
-                redcI: redcImportSte,
-                modlI: modlImportSte,
-                facI: faceImportSte,
-                untI: unitImportSte,
+            items.push({
                 unitName,
                 element,
-            }
-
-            itemList.push(item)
+                unitImport,
+                faceImport,
+                modlImport,
+                redcImport,
+                reduced,
+                model,
+            })
         }
-    })
 
-    let unitImports = ''
-    itemList.forEach((a) => {
-        unitImports += a.untI + '\n'
-    })
+        const gel = {
+            unitImports: items.map((i) => i.unitImport).join('\n'),
+            faceImports: items
+                .map((i) => `${i.faceImport}\n${i.modlImport}`)
+                .join('\n'),
+            unitList: `[${items.map((i) => `${i.unitName}Unit`).join(', ')}];`,
+            reduceImports: items.map((i) => i.redcImport).join('\n'),
+            reduceList: items.map((i) => `    ${i.reduced}`).join('\n'),
+            modelList: items.map((i) => `    ${i.model}`).join('\n'),
+        }
 
-    let faceImports = ''
-    itemList.forEach((a) => {
-        faceImports += a.facI + '\n'
-        faceImports += a.modlI + '\n'
-    })
+        // 5. Template Interpolation
+        const lines = rawTemplate.split('\n')
+        const outputLines: string[] = []
 
-    const unitListNom = []
-    itemList.forEach((a) => {
-        unitListNom.push(a.unitName + 'Unit')
-    })
+        for (const line of lines) {
+            if (line.trim().startsWith('//')) {
+                outputLines.push(line)
+                continue
+            }
+            try {
+                const compiled = doT.template(line)(gel)
+                outputLines.push(compiled)
+            } catch {
+                outputLines.push(line)
+            }
+        }
 
-    let unitList = JSON.stringify(unitListNom) + ';'
-    unitList = S(unitList).replaceAll('"', '')
+        const finalContent = outputLines.join('\n').replace(/\n{3,}/g, '\n\n')
+        const targetBeePath = path.join(targetDir, 'BEE.ts')
 
-    let reduceImports = ''
-    itemList.forEach((a) => {
-        reduceImports += a.redcI + '\n'
-    })
+        fs.writeFileSync(targetBeePath, finalContent, 'utf8')
 
-    let reduceList = ''
-    itemList.forEach((a, b) => {
-        //if (b == reduceList.length - 1) return;
-        reduceList += a.reduced + ', \n'
-    })
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [UPDATE] [OK] Manifest written: ${path.relative(repoRoot, targetBeePath).replace(/\\/g, '/')}`,
+            })
+        }
 
-    //reduceList += itemList[itemList.length - 1].reduced + "\n";
-
-    let modelList = ''
-    itemList.forEach((a, b) => {
-        modelList += a.model + '\n'
-    })
-
-    const gel = {
-        unitImports,
-        faceImports,
-        unitList,
-        reduceImports,
-        reduceList,
-        modelList,
+        if (bal?.slv != null) {
+            bal.slv({
+                libBit: {
+                    idx: 'update-library',
+                    src: path.relative(repoRoot, targetBeePath).replace(/\\/g, '/'),
+                    val: items.length,
+                },
+            })
+        }
+    } catch (err: any) {
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [RE-WIRE ERROR] ${errorMsg}`,
+            })
+        }
+        if (bal?.slv != null) {
+            bal.slv({
+                libBit: {
+                    idx: 'update-library-err',
+                    src: errorMsg,
+                },
+            })
+        }
     }
 
-    const writeLine = []
-
-    lineList.forEach(async (a, b) => {
-        if (S(a).contains('//')) return
-
-        const doTCompiled = doT.template(a)
-        const outLine = doTCompiled(gel)
-
-        writeLine.push(outLine)
-    })
-
-    writeLine.forEach(async (a) => {
-        bit = await ste.hunt(ActCns.UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: 'line : ' + a,
-        })
-    })
-
-    const finFile = writeLine.join('\n')
-
-    FS.ensureFileSync(fileFin)
-
-    const endLoc = path.join(targetDir, 'BEE.ts')
-
-    finFile
-
-    FS.writeFileSync(endLoc, finFile)
-
-    bit = await ste.hunt(ActCns.UPDATE_CONSOLE, {
-        idx: 'cns00',
-        src: 'writing ' + endLoc,
-    })
-
-    bal.slv({ libBit: { idx: 'update-library' } })
     return cpy
 }
 
@@ -785,5 +793,16 @@ export const flatLibrary = async (
         }
     }
 
+    return cpy
+}
+
+export const scanFleet = (
+    cpy: LibraryModel,
+    bal: LibraryBit,
+    ste: State,
+) => {
+    if (bal && bal.slv != null) {
+        bal.slv({ libBit: { idx: 'scan-fleet', lst: [] } })
+    }
     return cpy
 }

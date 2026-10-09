@@ -25,6 +25,9 @@ export function reducer(
         case Act.SCAN_LIBRARY:
             return Buzz.scanLibrary(clone(model), act.bale, state)
 
+        case Act.SCAN_FLEET:
+            return Buzz.scanFleet(clone(model), act.bale, state)
+
         case Act.LAUNCH_LIBRARY:
             return Buzz.launchLibrary(clone(model), act.bale, state)
 

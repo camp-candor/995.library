@@ -33,6 +33,12 @@ export class ScanLibrary implements Action {
     constructor(public bale: undefined) {}
 }
 
+export const SCAN_FLEET = '[Scan action] Scan Fleet'
+export class ScanFleet implements Action {
+    readonly type = SCAN_FLEET
+    constructor(public bale?: LibraryBit) {}
+}
+
 export const LAUNCH_LIBRARY = '[Launch action] Launch Library'
 export class LaunchLibrary implements Action {
     readonly type = LAUNCH_LIBRARY
@@ -51,5 +57,7 @@ export type Actions =
     | ListLibrary
     | ProgressLibrary
     | ScanLibrary
+    | ScanFleet
     | LaunchLibrary
     | FlatLibrary
+
