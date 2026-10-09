@@ -347,17 +347,15 @@ export const createUnit = (cpy: UnitModel, bal: UnitBit, ste: State) => {
         .relative(repoRoot, targetUnitDir)
         .replace(/\\/g, '/')
 
-    setTimeout(() => {
-        if (bal.slv != null) {
-            bal.slv({
-                untBit: {
-                    idx: 'create-unit',
-                    src: relativeResult,
-                    dat: { idx: bal.idx, path: targetUnitDir },
-                },
-            })
-        }
-    }, 2111)
+    if (bal.slv != null) {
+        bal.slv({
+            untBit: {
+                idx: 'create-unit',
+                src: relativeResult,
+                dat: { idx: bal.idx, path: targetUnitDir },
+            },
+        })
+    }
 
     return cpy
 }
@@ -556,7 +554,15 @@ export const updateUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
         const cpyNom = rootUpper + 'Model'
         const balNom = rootUpper + 'Bit'
         const lineList = cpy.buzzTemplate.toString().split('\n')
-        const gel = { buzNom, cpyNom, balNom }
+        const gel = {
+            buzNom,
+            cpyNom,
+            balNom,
+            nom,
+            root,
+            rootUpper,
+            actTle: nom + rootUpper,
+        }
 
         out.push('')
         lineList.forEach((a) => {
@@ -688,10 +694,9 @@ export const updateUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
             src: 'writing...' + actionFile,
         })
 
-    setTimeout(() => {
-        if (bal.slv != null)
-            bal.slv({ untBit: { idx: 'update-unit', dat: bal } })
-    }, 2111)
+    if (bal.slv != null) {
+        bal.slv({ untBit: { idx: 'update-unit', dat: bal } })
+    }
 
     return cpy
 }

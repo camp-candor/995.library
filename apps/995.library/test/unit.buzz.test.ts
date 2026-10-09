@@ -6,10 +6,11 @@ import { UnitModel } from '../995.library/01.unit.unit/unit.model'
 import {
     flattenUnit,
     createUnit,
+    updateUnit,
 } from '../995.library/01.unit.unit/buz/unit.buzz'
 
-function makeBal(idx: string, src?: string) {
-    return { idx, src, slv: sinon.fake() } as any
+function makeBal(idx: string, src?: string, dat?: any) {
+    return { idx, src, dat, slv: sinon.fake() } as any
 }
 
 function makeModel() {
@@ -67,7 +68,6 @@ test.serial(
             `${testIdx}.txt`,
         )
 
-        // Guaranteed teardown hook via AVA lifecycle
         t.teardown(async () => {
             await fs.remove(expectedOutputFile).catch(() => {})
             await fs.remove(tempDir).catch(() => {})
@@ -107,7 +107,7 @@ test.serial(
 )
 
 test.serial(
-    'createUnit -- scaffolds templates into root data/unit/00.<nom>.unit',
+    'createUnit -- scaffolds templates deterministically and resolves immediately without timeout',
     async (t) => {
         let repoRoot = process.cwd()
         while (
@@ -127,20 +127,18 @@ test.serial(
         const targetRelativeDir = `data/unit/00.${testVerb}.unit`
         const targetAbsoluteDir = path.join(repoRoot, targetRelativeDir)
 
-        // Guaranteed teardown hook via AVA lifecycle
         t.teardown(async () => {
             await fs.remove(targetAbsoluteDir).catch(() => {})
         })
 
         createUnit(makeModel(), bal, ste)
 
-        // createUnit internally holds a 2111ms delay
-        await new Promise((resolve) => setTimeout(resolve, 2500))
-
-        t.true(bal.slv.calledOnce, 'bal.slv should be called once')
+        t.true(
+            bal.slv.calledOnce,
+            'bal.slv must be invoked synchronously and immediately',
+        )
         const result = bal.slv.firstCall.args[0]
         t.is(result.untBit.idx, 'create-unit')
-
         t.true(
             result.untBit.src.startsWith(targetRelativeDir),
             `Expected ${targetRelativeDir}, got: ${result.untBit.src}`,
@@ -169,5 +167,100 @@ test.serial(
                 `Missing scaffolded file: ${relFile}`,
             )
         }
+    },
+)
+
+test.serial(
+    'updateUnit -- generates non-blocking async stubs and resolves immediately',
+    async (t) => {
+        let repoRoot = process.cwd()
+        while (
+            repoRoot &&
+            !(
+                fs.existsSync(path.join(repoRoot, 'apps')) &&
+                fs.existsSync(path.join(repoRoot, 'packages'))
+            )
+        ) {
+            const parent = path.dirname(repoRoot)
+            if (parent === repoRoot) break
+            repoRoot = parent
+        }
+
+        const tempUnitDir = path.join(
+            repoRoot,
+            'scratch_unit_update',
+            '00.demo.unit',
+        )
+        const buzzDir = path.join(tempUnitDir, 'buz')
+        await fs.ensureDir(buzzDir)
+
+        const buzzFile = path.join(buzzDir, 'demo.buzz.ts')
+        const buzzerFile = path.join(tempUnitDir, 'demo.buzzer.ts')
+        const actionFile = path.join(tempUnitDir, 'demo.action.ts')
+        const reduceFile = path.join(tempUnitDir, 'demo.reduce.ts')
+
+        await fs.writeFile(buzzFile, 'export const initDemo = () => {};\n')
+        await fs.writeFile(
+            buzzerFile,
+            'export { initDemo } from "./buz/demo.buzz";\n',
+        )
+        await fs.writeFile(
+            actionFile,
+            [
+                'export const INIT_DEMO = "[Demo action] Init Demo";',
+                'export class InitDemo { readonly type = INIT_DEMO; }',
+                'export type Actions = InitDemo;',
+            ].join('\n'),
+        )
+        await fs.writeFile(
+            reduceFile,
+            [
+                'import * as Act from "./demo.action";',
+                'export function reducer(model = {}, act = {}) {',
+                '  switch (act.type) {',
+                '    default: return model;',
+                '  }',
+                '}',
+            ].join('\n'),
+        )
+
+        t.teardown(async () => {
+            await fs
+                .remove(path.join(repoRoot, 'scratch_unit_update'))
+                .catch(() => {})
+        })
+
+        const bal = makeBal(
+            '00.demo.unit',
+            path.join(repoRoot, 'scratch_unit_update'),
+            'open',
+        )
+
+        await updateUnit(makeModel(), bal, ste)
+
+        t.true(
+            bal.slv.calledOnce,
+            'updateUnit must resolve immediately without timeout',
+        )
+        const res = bal.slv.firstCall.args[0]
+        t.is(res.untBit.idx, 'update-unit')
+
+        const buzzContent = await fs.readFile(buzzFile, 'utf8')
+        t.true(
+            buzzContent.includes('export const openDemo = async'),
+            'Must append async openDemo export',
+        )
+        t.true(
+            buzzContent.includes('Update Console'),
+            'Must include non-blocking console telemetry',
+        )
+        t.true(
+            buzzContent.includes("bal.slv({ openBit: { idx: 'openDemo-stub' } })"),
+            'Must resolve bal.slv with openBit payload',
+        )
+        t.false(
+            buzzContent.includes('debugger'),
+            'Must not include blocking debugger statements',
+        )
     },
 )
