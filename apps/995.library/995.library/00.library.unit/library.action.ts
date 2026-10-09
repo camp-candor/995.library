@@ -51,6 +51,12 @@ export class FlatLibrary implements Action {
     constructor(public bale?: LibraryBit) {}
 }
 
+export const AUDIT_LIBRARY = '[Audit action] Audit Library'
+export class AuditLibrary implements Action {
+    readonly type = AUDIT_LIBRARY
+    constructor(public bale?: LibraryBit) {}
+}
+
 export const CHECK_GIT_WORKING_TREE = '[Git action] Check Git Working Tree'
 export class CheckGitWorkingTree implements Action {
     readonly type = CHECK_GIT_WORKING_TREE
@@ -74,4 +80,5 @@ export type Actions =
     | ScanFleet
     | LaunchLibrary
     | FlatLibrary
+    | AuditLibrary
 
