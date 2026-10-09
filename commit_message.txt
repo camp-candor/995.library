@@ -1,0 +1,8 @@
+Resilient AST Injection and Verification Alignment (Epic 3 Phase 3)
+
+This commit addresses the following tasks from the directive:
+
+- TASK-3.1: Upgrades brittle line-slicing to resilient anchor & regex AST injection in `unit.buzz.ts`, guarding against Prettier multi-line formatting of action types and providing idempotency against duplicate injection.
+- TASK-3.2: Replaces blocking `debugger;` telemetry stubs in `unit.model.ts` with non-blocking stubs emitting to `cns00`.
+- TASK-3.3: Implements a TTY raw-mode circuit breaker in `terminal.buzz.ts` ensuring `screen.leave()` is called properly during terminal close and teardown.
+- TASK-3.4: Replaces arbitrary delay-based tests with a comprehensive automated test battery in `test/unit.buzz.test.ts` to assert injection works effectively under Prettier-formatted multi-line files.
