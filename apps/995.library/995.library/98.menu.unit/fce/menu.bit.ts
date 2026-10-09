@@ -4,4 +4,5 @@ export default interface MenuBit {
     lst?: any
     fnc?: Function
     slv?: Function
+    dat?: any
 }
