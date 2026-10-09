@@ -253,9 +253,10 @@ test.serial(
     async (t) => {
         const bal = makeBal()
         const model = makeModel()
+        process.env.FLEET_ROOT = process.cwd();
         const action = new ScanFleet(bal)
 
-        const resultModel = reducer(model, action, ste)
+        const resultModel = await reducer(model, action, ste)
         t.truthy(resultModel, 'Reducer must return state model')
         t.true(bal.slv.calledOnce, 'bal.slv should be called once by scanFleet stub')
 

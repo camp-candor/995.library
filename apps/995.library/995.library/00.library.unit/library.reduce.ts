@@ -19,6 +19,9 @@ export function reducer(
         case Act.LIST_LIBRARY:
             return Buzz.listLibrary(clone(model), act.bale, state)
 
+        case Act.PROGRESS_LIBRARY_SAGA:
+            return Buzz.progressLibrarySaga(clone(model), act.bale, state)
+
         case Act.PROGRESS_LIBRARY:
             return Buzz.progressLibrary(clone(model), act.bale, state)
 
