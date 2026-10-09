@@ -274,14 +274,13 @@ test.serial(
         const model = makeModel()
         const action = new ActLib.AuditLibrary(bal)
 
-        const resultModel = reducer(model, action, ste)
+        const resultModel = await reducer(model, action, ste)
         t.truthy(resultModel, 'Reducer must return state model')
-        t.true(bal.slv.calledOnce, 'bal.slv should be called once by auditLibrary stub')
+        t.true(bal.slv.calledOnce, 'bal.slv should be called once by auditLibrary')
 
         const result = bal.slv.firstCall.args[0]
         t.is(result.libBit.idx, 'audit-library')
-        t.is(result.libBit.dat, null)
-        t.is(result.libBit.val, 0)
+        t.is(typeof result.libBit.val, 'number')
     },
 )
 

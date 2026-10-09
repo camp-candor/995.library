@@ -10,6 +10,7 @@ const candidatePaths = [
 ];
 const manifestPath = candidatePaths.find((p) => fs.existsSync(p)) || candidatePaths[0];
 
+
 test('versions.json -- file exists and is valid JSON', (t) => {
   t.true(fs.existsSync(manifestPath), `Manifest must exist at ${manifestPath}`);
   const raw = fs.readFileSync(manifestPath, 'utf8');

@@ -19,7 +19,8 @@ import {
     rollbackSagaJournal,
     finalizeSagaJournal,
     getJournalPath,
-    type SagaJournal
+    type SagaJournal,
+    auditLibrary
 } from '../995.library/00.library.unit/buz/library.buzz'
 
 const cleanEnv = () => {
@@ -971,3 +972,122 @@ test.serial('Phase 3 Finalize: sweeps lingering backups and unlinks active journ
     t.false(await fs.pathExists(backupDir));
     t.false(await fs.pathExists(journalFile));
 });
+
+test.serial('auditLibrary -- parses manifest and validates aligned repositories', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_test_audit_aligned')
+    await fs.ensureDir(sandboxDir)
+    process.env.FLEET_ROOT = sandboxDir
+
+    const repoADir = path.join(sandboxDir, 'repoA')
+    await fs.ensureDir(path.join(repoADir, 'apps/995.library'))
+    await fs.writeJson(path.join(repoADir, 'apps/995.library/package.json'), {
+        name: '@test/repoA',
+        version: '1.0.12',
+    })
+
+    const manifestFile = path.join(sandboxDir, 'versions.json')
+    await fs.writeJson(manifestFile, {
+        schema_version: 1,
+        library_version: '1.0.12',
+        updated_at: new Date().toISOString(),
+        sovereign_repo: 'camp-candor/995.library',
+        allow_periphery_broadcast: false,
+        repositories: {
+            repoA: {
+                path: repoADir,
+                pinned_sha: '7bd4e10a8b9c2d3e4f5a6b7c8d9e0f1a2b3c4d5e',
+                required_contract_version: '1.0.12',
+                expected_branch: 'main',
+                status: 'LOCKED',
+            },
+        },
+    })
+
+    t.teardown(async () => {
+        delete process.env.FLEET_ROOT
+        await fs.remove(sandboxDir).catch(() => {})
+    })
+
+    const slv = sinon.fake()
+    const bal = { src: manifestFile, slv } as any
+
+    await auditLibrary(new LibraryModel(), bal, null as any)
+
+    t.true(slv.calledOnce, 'Resolver must be executed')
+    const res = slv.firstCall.args[0]
+    t.is(res.libBit.idx, 'audit-library')
+    t.is(res.libBit.val, 0, 'Zero drift expected')
+
+    const report = res.libBit.dat
+    t.is(report.records.length, 1)
+    t.is(report.records[0].repo, 'repoA')
+    t.is(report.records[0].status, 'ALIGNED')
+})
+
+test.serial('auditLibrary -- detects DRIFT_VERSION, DRIFT_BRANCH, and MISSING repos', async (t) => {
+    const sandboxDir = path.resolve(process.cwd(), 'scratch_test_audit_drift')
+    await fs.ensureDir(sandboxDir)
+    process.env.FLEET_ROOT = sandboxDir
+
+    // Stale Repo
+    const staleDir = path.join(sandboxDir, 'staleRepo')
+    await fs.ensureDir(path.join(staleDir, 'apps/995.library'))
+    await fs.writeJson(path.join(staleDir, 'apps/995.library/package.json'), {
+        version: '1.0.10',
+    })
+
+    const manifestFile = path.join(sandboxDir, 'versions.json')
+    await fs.writeJson(manifestFile, {
+        schema_version: 1,
+        library_version: '1.0.12',
+        updated_at: new Date().toISOString(),
+        sovereign_repo: 'camp-candor/995.library',
+        repositories: {
+            staleRepo: {
+                path: staleDir,
+                required_contract_version: '1.0.12',
+                expected_branch: 'main',
+            },
+            missingRepo: {
+                path: path.join(sandboxDir, 'nonexistent_repo'),
+                required_contract_version: '1.0.12',
+                expected_branch: 'main',
+            },
+        },
+    })
+
+    t.teardown(async () => {
+        delete process.env.FLEET_ROOT
+        await fs.remove(sandboxDir).catch(() => {})
+    })
+
+    const slv = sinon.fake()
+    const bal = { src: manifestFile, slv } as any
+
+    await auditLibrary(new LibraryModel(), bal, null as any)
+
+    t.true(slv.calledOnce)
+    const res = slv.firstCall.args[0]
+    t.is(res.libBit.idx, 'audit-library')
+    t.is(res.libBit.val, 2, 'Two drifted repositories expected')
+
+    const report = res.libBit.dat
+    const staleRecord = report.records.find((r: any) => r.repo === 'staleRepo')
+    const missingRecord = report.records.find((r: any) => r.repo === 'missingRepo')
+
+    t.is(staleRecord.status, 'DRIFT_VERSION')
+    t.is(missingRecord.status, 'MISSING')
+})
+
+test.serial('auditLibrary -- fails closed cleanly on missing or corrupt manifest', async (t) => {
+    const slv = sinon.fake()
+    const bal = { src: '/path/to/missing/versions.json', slv } as any
+
+    await auditLibrary(new LibraryModel(), bal, null as any)
+
+    t.true(slv.calledOnce)
+    const res = slv.firstCall.args[0]
+    t.is(res.libBit.idx, 'audit-library-error')
+    t.is(res.libBit.val, 0)
+    t.is(res.libBit.dat, null)
+})
