@@ -2,7 +2,6 @@
 import { MenuModel } from '../menu.model'
 import MenuBit from '../fce/menu.bit'
 import State from '../../99.core/state'
-//import { HexmapModel } from "../../03.hexmap.unit/hexmap.model";
 
 import * as ActLib from '../../00.library.unit/library.action'
 import * as ActUnt from '../../01.unit.unit/unit.action'
@@ -17,8 +16,6 @@ import * as FOCUS from '../../val/focus'
 
 import * as ActMnu from '../menu.action'
 
-//import * as ActFoc from "../../01.focus.unit/focus.action";
-//import * as ActPvt from "../../96.pivot.unit/pivot.action";
 import * as ActGer from '../../05.gears.unit/gears.action'
 import * as ActTrm from '../../80.terminal.unit/terminal.action'
 import * as ActChc from '../../85.choice.unit/choice.action'
@@ -63,6 +60,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActLib.PROGRESS_LIBRARY.split(']')[1],
         ActLib.UPDATE_LIBRARY.split(']')[1],
         ActLib.LIST_LIBRARY.split(']')[1],
+        ActLib.AUDIT_LIBRARY.split(']')[1],
         ActLib.LAUNCH_LIBRARY.split(']')[1],
         'ROOT MENU',
     ]
@@ -82,6 +80,8 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             '-Regenerate the library\nwiring manifest (BEE.ts).',
         [ActLib.LIST_LIBRARY.split(']')[1]]:
             '-List all the units\ncurrently in the library.',
+        [ActLib.AUDIT_LIBRARY.split(']')[1]]:
+            '-Compare fleet repositories against\nthe Central Coordination Manifest.',
         [ActGer.LORE_GEARS.split(']')[1]]:
             '-List all GEARS units\ncurrently in the library.',
         [ActGer.CREATE_GEARS.split(']')[1]]:
@@ -103,7 +103,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             clr1: Color.YELLOW,
             cb: (choice: string) => {
                 const text = descriptions[choice] || 'No description available.'
-                text.split('\n').forEach((src) =>
+                text.split('\n').forEach((src: string) =>
                     ste.hunt(ActCns.UPDATE_CONSOLE, {
                         idx: 'cns00',
                         src,
@@ -118,6 +118,15 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     src = bit.chcBit.src
 
     switch (src) {
+        case ActLib.AUDIT_LIBRARY.split(']')[1]:
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [TUI] Executing Fleet Drift Audit...',
+            })
+            bit = await ste.hunt(ActLib.AUDIT_LIBRARY, {})
+            bit = await ste.hunt(ActMnu.PRINT_MENU, bit)
+            break
+
         case ActLib.LAUNCH_LIBRARY.split(']')[1]:
             bit = await ste.hunt(ActLib.LAUNCH_LIBRARY, {})
             break
@@ -232,7 +241,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         case ActUnt.UPDATE_UNIT.split(']')[1]:
             bit = await ste.hunt(ActUnt.CONTAIN_UNIT, { src })
             const fullPivotList = bit.untBit.lst
-            const pivotList = fullPivotList.map((item) => {
+            const pivotList = fullPivotList.map((item: string) => {
                 const clean = item.replace(/[[\]]/g, '')
                 const parts = clean.split('/')
                 return `[${parts[parts.length - 1]}]`
@@ -296,7 +305,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 
             bit = await ste.hunt(ActUnt.LIST_UNIT, { src })
             const fullUnitList = bit.untBit.lst
-            const unitList = fullUnitList.map((item) => {
+            const unitList = fullUnitList.map((item: string) => {
                 const parts = item.split('/')
                 return parts[parts.length - 1]
             })
@@ -326,7 +335,6 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                     dex = dex + 10 >= unitList.length ? 0 : dex + 10
                     await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
                 } else {
-                    // Use the index of the selected clean name to get the full path
                     const selectedIdx = unitList.indexOf(res)
                     idx = fullUnitList[selectedIdx]
                     unitSelection = res
@@ -334,8 +342,6 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             }
 
             await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-
-            //debugger;
 
             bit = await ste.hunt(ActGrd.UPDATE_GRID, {
                 x: 0,
@@ -424,7 +430,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                     }
                 }
             } catch (e) {
-                // ignore read error
+                // ignore
             }
 
             childDirs.sort((a, b) => a.localeCompare(b))
@@ -502,31 +508,6 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             bit = await ste.hunt(ActMnu.PRINT_MENU, bit)
             break
 
-        case ActUnt.CREATE_UNIT.split(']')[1]:
-            bit = await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-
-            bit = await ste.hunt(ActGrd.UPDATE_GRID, {
-                x: 0,
-                y: 4,
-                xSpan: 4,
-                ySpan: 6,
-            })
-            bit = await ste.hunt(ActPut.OPEN_INPUT, {
-                dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
-                src: Align.VERTICAL,
-                lst,
-                txt: 'input verb',
-                net: bit.grdBit.dat,
-            })
-            idx = bit.putBit.src
-
-            var updateBit = await ste.hunt(ActUnt.CREATE_UNIT, { idx })
-
-            bit = await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-
-            bit = await ste.hunt(ActMnu.PRINT_MENU, updateBit)
-            break
-
         case ActLib.LIST_LIBRARY.split(']')[1]:
             var bit = await ste.hunt(ActLib.LIST_LIBRARY, {})
             lst = bit.libBit.lst
@@ -541,19 +522,18 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                     idx: 'cns00',
                     src: 'Listing Libraries...',
                 })
-                lst.forEach((a) =>
+                lst.forEach((a: string) =>
                     ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src: a }),
                 )
             }
 
             await new Promise((resolve) => setTimeout(resolve, 3000))
-
             break
 
         case ActLib.UPDATE_LIBRARY.split(']')[1]:
             var bit = await ste.hunt(ActLib.LIST_LIBRARY, {})
             const fullLibList = bit.libBit.lst
-            const displayLibList = fullLibList.map((item) => {
+            const displayLibList = fullLibList.map((item: string) => {
                 const clean = item.replace(/[[\]]/g, '')
                 const parts = clean.split('/')
                 return `[${parts[parts.length - 1]}]`
@@ -656,4 +636,4 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     return cpy
 }
 
-var patch = (ste, type, bale) => ste.dispatch({ type, bale })
+var patch = (ste: any, type: any, bale: any) => ste.dispatch({ type, bale })
