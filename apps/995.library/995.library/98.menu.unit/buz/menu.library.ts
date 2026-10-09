@@ -63,6 +63,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActLib.PROGRESS_LIBRARY.split(']')[1],
         ActLib.UPDATE_LIBRARY.split(']')[1],
         ActLib.LIST_LIBRARY.split(']')[1],
+        ActLib.AUDIT_LIBRARY.split(']')[1],
         ActLib.LAUNCH_LIBRARY.split(']')[1],
         'ROOT MENU',
     ]
@@ -82,6 +83,8 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             '-Regenerate the library\nwiring manifest (BEE.ts).',
         [ActLib.LIST_LIBRARY.split(']')[1]]:
             '-List all the units\ncurrently in the library.',
+        [ActLib.AUDIT_LIBRARY.split(']')[1]]:
+            '-Compare fleet repositories against\nthe Central Coordination Manifest.',
         [ActGer.LORE_GEARS.split(']')[1]]:
             '-List all GEARS units\ncurrently in the library.',
         [ActGer.CREATE_GEARS.split(']')[1]]:
@@ -548,6 +551,34 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 
             await new Promise((resolve) => setTimeout(resolve, 3000))
 
+            break
+
+        case ActLib.AUDIT_LIBRARY.split(']')[1]:
+            var bit = await ste.hunt(ActLib.AUDIT_LIBRARY, {})
+
+            const data = bit.libBit.dat
+
+            const { totalTracked, alignedCount, driftedCount } = data
+
+            ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `--- AUDIT SUMMARY ---`,
+            })
+            ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `Total Repositories: ${totalTracked}`,
+            })
+            ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `Aligned: ${alignedCount}`,
+            })
+            ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `Drifted: ${driftedCount}`,
+            })
+
+            await new Promise((resolve) => setTimeout(resolve, 3000))
+            bit = await ste.hunt(ActMnu.PRINT_MENU, bit)
             break
 
         case ActLib.UPDATE_LIBRARY.split(']')[1]:
