@@ -4,7 +4,7 @@ import path from 'path'
 import fs from 'fs-extra'
 import { LibraryModel } from '../995.library/00.library.unit/library.model'
 import { reducer } from '../995.library/00.library.unit/library.reduce'
-import { ScanFleet } from '../995.library/00.library.unit/library.action'
+import { ScanFleet, AuditLibrary } from '../995.library/00.library.unit/library.action'
 import {
     flatLibrary,
     updateLibrary,
@@ -266,3 +266,21 @@ test.serial(
     },
 )
 
+
+test.serial(
+    'auditLibrary -- dispatches through reducer and executes baseline buzzer cleanly',
+    async (t) => {
+        const bal = makeBal()
+        const model = makeModel()
+        const action = new AuditLibrary(bal)
+
+        const resultModel = reducer(model, action, ste)
+        t.truthy(resultModel, 'Reducer must return state model')
+        t.true(bal.slv.calledOnce, 'bal.slv should be called once by auditLibrary stub')
+
+        const result = bal.slv.firstCall.args[0]
+        t.is(result.libBit.idx, 'audit-library')
+        t.is(result.libBit.dat, null)
+        t.is(result.libBit.val, 0)
+    },
+)
