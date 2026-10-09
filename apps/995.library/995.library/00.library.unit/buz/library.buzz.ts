@@ -906,28 +906,170 @@ export const scanFleet = async (
     bal: LibraryBit,
     ste: State,
 ) => {
+    const fs = require('fs-extra')
+    const path = require('path')
+    const ActCns = require('../../83.console.unit/console.action')
+
     const fleetRoot = resolveFleetRoot()
 
     if (!fleetRoot) {
         if (ste) {
-            const ActCns = require('../../83.console.unit/console.action')
             await ste.hunt(ActCns.UPDATE_CONSOLE, {
                 idx: 'cns00',
                 src: '>> [SCAN_FLEET_ERR] Unable to resolve fleet root boundary.',
             })
         }
         if (bal && bal.slv != null) {
-            bal.slv({ libBit: { idx: 'scan-fleet-error', lst: [], val: -1 } })
+            bal.slv({
+                libBit: {
+                    idx: 'scan-fleet-error',
+                    src: 'NO_FLEET_ROOT',
+                    lst: [],
+                    val: -1,
+                },
+            })
         }
         return cpy
     }
 
-    // Phase 2 stub resolves discovered root; Phase 3 will populate complete fleetMap
-    if (bal && bal.slv != null) {
-        bal.slv({
-            libBit: { idx: 'scan-fleet', lst: [], src: fleetRoot, val: 0 },
+    if (ste) {
+        await ste.hunt(ActCns.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: `>> [SCAN_FLEET] Initiating fleet scan from root: ${fleetRoot}`,
         })
     }
+
+    const IGNORED = new Set([
+        'node_modules',
+        '.git',
+        'dist',
+        '.wrangler',
+        '$RECYCLE.BIN',
+        'Config.Msi',
+        'coverage',
+        '.nyc_output',
+        '.idea',
+        '.vscode',
+    ])
+
+    const reposToCheck = new Set<string>()
+
+    const isRepo = (dir: string): boolean => {
+        try {
+            return (
+                fs.existsSync(path.join(dir, 'package.json')) ||
+                fs.existsSync(path.join(dir, 'apps')) ||
+                fs.existsSync(path.join(dir, 'packages'))
+            )
+        } catch {
+            return false
+        }
+    }
+
+    try {
+        const topEntries = fs.readdirSync(fleetRoot, { withFileTypes: true })
+
+        for (const entry of topEntries) {
+            if (!entry.isDirectory()) continue
+            if (IGNORED.has(entry.name)) continue
+
+            const entryPath = path.join(fleetRoot, entry.name)
+
+            // 1. Direct repository under fleetRoot
+            if (isRepo(entryPath)) {
+                reposToCheck.add(entryPath)
+            }
+
+            // 2. Multi-tenant organizational cluster subdirectories
+            try {
+                const subEntries = fs.readdirSync(entryPath, {
+                    withFileTypes: true,
+                })
+                for (const sub of subEntries) {
+                    if (!sub.isDirectory()) continue
+                    if (IGNORED.has(sub.name)) continue
+
+                    const subPath = path.join(entryPath, sub.name)
+                    if (isRepo(subPath)) {
+                        reposToCheck.add(subPath)
+                    }
+                }
+            } catch {
+                // Ignore unreadable subfolders
+            }
+        }
+
+        const fleetMap: string[] = []
+        const targetPivot =
+            bal && bal.src ? bal.src.replace(/[\[\]]/g, '').trim() : null
+
+        for (const repoPath of reposToCheck) {
+            if (targetPivot) {
+                const pkgTarget = path.join(repoPath, 'packages', targetPivot)
+                const appTarget = path.join(repoPath, 'apps', targetPivot)
+
+                if (fs.existsSync(pkgTarget)) {
+                    const rel = path
+                        .relative(fleetRoot, pkgTarget)
+                        .replace(/\\/g, '/')
+                    fleetMap.push(`[${rel}]`)
+                } else if (fs.existsSync(appTarget)) {
+                    const rel = path
+                        .relative(fleetRoot, appTarget)
+                        .replace(/\\/g, '/')
+                    fleetMap.push(`[${rel}]`)
+                }
+            } else {
+                // Default: Discover all repositories housing apps/995.library harness
+                const harnessTarget = path.join(repoPath, 'apps', '995.library')
+                if (fs.existsSync(harnessTarget)) {
+                    const rel = path
+                        .relative(fleetRoot, harnessTarget)
+                        .replace(/\\/g, '/')
+                    fleetMap.push(`[${rel}]`)
+                }
+            }
+        }
+
+        fleetMap.sort((a, b) => a.localeCompare(b))
+
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [SCAN_FLEET_OK] Discovered ${fleetMap.length} targets across fleet.`,
+            })
+        }
+
+        if (bal && bal.slv != null) {
+            bal.slv({
+                libBit: {
+                    idx: 'scan-fleet',
+                    lst: fleetMap,
+                    val: fleetMap.length,
+                    src: fleetRoot,
+                },
+            })
+        }
+    } catch (err: any) {
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [SCAN_FLEET_ERR] Scan failure: ${err.message}`,
+            })
+        }
+        if (bal && bal.slv != null) {
+            bal.slv({
+                libBit: {
+                    idx: 'scan-fleet-error',
+                    src: err.message,
+                    lst: [],
+                    val: -1,
+                },
+            })
+        }
+    }
+
     return cpy
 }
+
 

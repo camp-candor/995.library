@@ -261,7 +261,7 @@ test.serial(
 
         const result = bal.slv.firstCall.args[0]
         t.is(result.libBit.idx, 'scan-fleet')
-        t.deepEqual(result.libBit.lst, [])
+        t.true(Array.isArray(result.libBit.lst))
     },
 )
 
