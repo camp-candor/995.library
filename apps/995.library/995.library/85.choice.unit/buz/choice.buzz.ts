@@ -131,7 +131,7 @@ export const openChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
         }
     })
 
-    if (buttons.length > 0) {
+    if (buttons.length > 0 && typeof buttons[0].focus === 'function') {
         buttons[0].focus()
     }
 
