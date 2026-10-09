@@ -43,6 +43,18 @@ export class RouteMenu implements Action {
     constructor(public bale: undefined) {}
 }
 
+export const FLEET_MENU = '[Menu action] Fleet Menu'
+export class FleetMenu implements Action {
+    readonly type = FLEET_MENU
+    constructor(public bale?: MenuBit) {}
+}
+
+export const SAGA_TORN_STATE_MENU = '[Menu action] Saga Torn State Menu'
+export class SagaTornStateMenu implements Action {
+    readonly type = SAGA_TORN_STATE_MENU
+    constructor(public bale: MenuBit) {}
+}
+
 export type Actions =
     | OpenMenu
     | InitMenu
@@ -51,3 +63,5 @@ export type Actions =
     | PrintMenu
     | LibraryMenu
     | RouteMenu
+    | FleetMenu
+    | SagaTornStateMenu
