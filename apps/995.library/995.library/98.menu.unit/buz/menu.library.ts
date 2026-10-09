@@ -41,6 +41,11 @@ var bit, lst, dex, idx, dat, src
 var opened = false
 
 export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
+    if (!ste) {
+        if (bal?.slv) bal.slv({ mnuBit: { idx: 'library-menu-headless' } })
+        return cpy
+    }
+
     bit = await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
 
     bit = await ste.hunt(ActCns.UPDATE_CONSOLE, {
@@ -554,30 +559,37 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             break
 
         case ActLib.AUDIT_LIBRARY.split(']')[1]:
+            bit = await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> Executing Fleet Drift Audit...',
+            })
+
             var bit = await ste.hunt(ActLib.AUDIT_LIBRARY, {})
 
-            const data = bit.libBit.dat
+            const data = bit?.libBit?.dat
 
-            const { totalTracked, alignedCount, driftedCount } = data
+            if (data) {
+                const { totalTracked, alignedCount, driftedCount } = data
 
-            ste.hunt(ActCns.UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: `--- AUDIT SUMMARY ---`,
-            })
-            ste.hunt(ActCns.UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: `Total Repositories: ${totalTracked}`,
-            })
-            ste.hunt(ActCns.UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: `Aligned: ${alignedCount}`,
-            })
-            ste.hunt(ActCns.UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: `Drifted: ${driftedCount}`,
-            })
+                ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `--- AUDIT SUMMARY ---`,
+                })
+                ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `Total Repositories: ${totalTracked}`,
+                })
+                ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `Aligned: ${alignedCount}`,
+                })
+                ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `Drifted: ${driftedCount}`,
+                })
+            }
 
-            await new Promise((resolve) => setTimeout(resolve, 3000))
+            await new Promise((resolve) => setTimeout(resolve, 333))
             bit = await ste.hunt(ActMnu.PRINT_MENU, bit)
             break
 
