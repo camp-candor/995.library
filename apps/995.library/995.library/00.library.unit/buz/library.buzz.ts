@@ -12,6 +12,60 @@ let bit, val, idx, dex, lst, dat
 
 const exec = require('child_process').exec
 
+export const ZERO_TRUST_EXCLUDED_NAMES = new Set([
+    '.env',
+    '.git',
+    '.github',
+    'node_modules',
+    'dist',
+    'coverage',
+    '.wrangler',
+]);
+
+export const filterZeroTrust = (srcPath: string): boolean => {
+    const path = require('path');
+    const base = path.basename(srcPath);
+
+    if (ZERO_TRUST_EXCLUDED_NAMES.has(base)) return false;
+    if (base.startsWith('.env.')) return false;
+    if (base.startsWith('.dev.vars')) return false;
+    if (base.endsWith('.tsbuildinfo')) return false;
+    if (base.endsWith('.pem') || base.endsWith('.key')) return false;
+    if (base.startsWith('service-account') && base.endsWith('.json')) return false;
+
+    return true;
+};
+
+export const stageLibraryPayload = async (
+    sourceDir: string,
+    targetDir: string,
+    nonce?: string,
+): Promise<{ stagingDir: string; parentDir: string }> => {
+    const fs = require('fs-extra');
+    const path = require('path');
+
+    const resolvedTarget = path.isAbsolute(targetDir)
+        ? targetDir
+        : path.resolve(process.cwd(), targetDir);
+    const parentDir = path.dirname(resolvedTarget);
+    const uniqueNonce = nonce || `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const stagingDir = path.join(parentDir, `.tmp_staging_995_library_${uniqueNonce}`);
+
+    try {
+        await fs.ensureDir(stagingDir);
+        await fs.copy(sourceDir, stagingDir, {
+            dereference: true,
+            filter: filterZeroTrust,
+        });
+        return { stagingDir, parentDir };
+    } catch (err: any) {
+        if (await fs.pathExists(stagingDir)) {
+            await fs.remove(stagingDir).catch(() => {});
+        }
+        throw new Error(`[STAGING_FAILED] Error staging payload to ${stagingDir}: ${err.message}`);
+    }
+};
+
 export const initLibrary = async (
     cpy: LibraryModel,
     bal: LibraryBit,
@@ -1329,84 +1383,93 @@ export const progressLibrarySaga = async (
             break
         }
 
-        const targetParent = path.dirname(resolvedTarget)
-        const nonce = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
-        const stagingDir = path.join(targetParent, `.tmp_staging_995_library_${nonce}`)
-        const backupDir = path.join(targetParent, `.tmp_backup_995_library_${nonce}`)
+        // =====================================================================
+        // PHASE 1: ISOLATED STAGING & ZERO-TRUST FILTRATION
+        // =====================================================================
+        const nonce = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        let stagingDir = '';
+        const backupDir = path.join(path.dirname(resolvedTarget), `.tmp_backup_995_library_${nonce}`);
 
         try {
             if (ste) {
                 await ste.hunt(ActCns.UPDATE_CONSOLE, {
                     idx: 'cns00',
-                    src: `>> [STAGING] Target: ${resolvedTarget}`,
-                })
+                    src: `>> [STAGING] Staging payload beside target: ${resolvedTarget}`,
+                });
             }
 
-            await fs.ensureDir(stagingDir)
-            await fs.copy(sourceDir, stagingDir, {
-                dereference: true,
-                filter: copyFilter,
-            })
+            const staged = await stageLibraryPayload(sourceDir, resolvedTarget, nonce);
+            stagingDir = staged.stagingDir;
 
-            const targetExists = await fs.pathExists(resolvedTarget)
+            if (ste) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [STAGING] [OK] Filtered payload staged at: ${stagingDir}`,
+                });
+            }
+
+            // =================================================================
+            // PHASE 2: ATOMIC INODE PROMOTION
+            // =================================================================
+            const targetExists = await fs.pathExists(resolvedTarget);
             if (targetExists) {
-                await fs.rename(resolvedTarget, backupDir)
-                sagaJournal.backups.set(resolvedTarget, backupDir)
+                await fs.rename(resolvedTarget, backupDir);
+                sagaJournal.backups.set(resolvedTarget, backupDir);
                 if (ste) {
                     await ste.hunt(ActCns.UPDATE_CONSOLE, {
                         idx: 'cns00',
                         src: `>> [BACKUP] Sibling backup created: ${backupDir}`,
-                    })
+                    });
                 }
             }
 
-            await fs.rename(stagingDir, resolvedTarget)
+            await fs.rename(stagingDir, resolvedTarget);
 
             if (await fs.pathExists(backupDir)) {
-                await fs.remove(backupDir)
+                await fs.remove(backupDir);
             }
 
-            sagaJournal.targetsCompleted.push(resolvedTarget)
+            sagaJournal.targetsCompleted.push(resolvedTarget);
 
             if (ste) {
                 await ste.hunt(ActCns.UPDATE_CONSOLE, {
                     idx: 'cns00',
                     src: `>> [SUCCESS] Promoted library -> ${resolvedTarget}`,
-                })
+                });
             }
         } catch (err: any) {
             if (ste) {
                 await ste.hunt(ActCns.UPDATE_CONSOLE, {
                     idx: 'cns00',
-                    src: `>> [ERROR] Staging failed on ${resolvedTarget}: ${err.message}`,
-                })
+                    src: `>> [ERROR] Staging or swap failed on ${resolvedTarget}: ${err.message}`,
+                });
             }
 
             if ((await fs.pathExists(backupDir)) && !(await fs.pathExists(resolvedTarget))) {
                 try {
-                    await fs.rename(backupDir, resolvedTarget)
+                    await fs.rename(backupDir, resolvedTarget);
                     if (ste) {
                         await ste.hunt(ActCns.UPDATE_CONSOLE, {
                             idx: 'cns00',
                             src: `>> [RESTORED] Pre-existing target restored from backup: ${resolvedTarget}`,
-                        })
+                        });
                     }
                 } catch (restoreErr: any) {
                     if (ste) {
                         await ste.hunt(ActCns.UPDATE_CONSOLE, {
                             idx: 'cns00',
                             src: `>> [CRITICAL] Failed to restore backup: ${restoreErr.message}`,
-                        })
+                        });
                     }
                 }
             }
 
-            if (await fs.pathExists(stagingDir)) {
-                await fs.remove(stagingDir)
+            if (stagingDir && (await fs.pathExists(stagingDir))) {
+                await fs.remove(stagingDir).catch(() => {});
             }
 
-            sagaJournal.targetsFailed.push(resolvedTarget)
-            break
+            sagaJournal.targetsFailed.push(resolvedTarget);
+            break;
         }
     }
 
