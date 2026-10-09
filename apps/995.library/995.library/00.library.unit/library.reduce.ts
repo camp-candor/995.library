@@ -37,7 +37,11 @@ export function reducer(
         case Act.FLAT_LIBRARY:
             return Buzz.flatLibrary(clone(model), act.bale, state)
 
+        case Act.AUDIT_LIBRARY:
+            return Buzz.auditLibrary(clone(model), act.bale, state)
+
         default:
             return model
     }
 }
+
