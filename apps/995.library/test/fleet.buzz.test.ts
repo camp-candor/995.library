@@ -126,6 +126,228 @@ test.serial(
 )
 
 test.serial(
+    'scanFleet -- discovers apps/995.library across multi-tenant organization directories',
+    async (t) => {
+        const mockFleetRoot = path.resolve(
+            process.cwd(),
+            'scratch_test_fleet_scan',
+        )
+        const repoA = path.join(mockFleetRoot, 'campc-it-com', '000.repo-bot')
+        const repoB = path.join(
+            mockFleetRoot,
+            'astro-kahn-it-com',
+            '001.goblin-lore',
+        )
+        const repoC = path.join(
+            mockFleetRoot,
+            'slopratchet.com',
+            '999.plain-service',
+        )
+
+        // Repos A & B contain apps/995.library; Repo C does not
+        await fs.ensureDir(path.join(repoA, 'apps', '995.library'))
+        await fs.writeFile(
+            path.join(repoA, 'package.json'),
+            '{"name":"repo-bot"}',
+        )
+
+        await fs.ensureDir(path.join(repoB, 'apps', '995.library'))
+        await fs.writeFile(
+            path.join(repoB, 'package.json'),
+            '{"name":"goblin-lore"}',
+        )
+
+        await fs.ensureDir(path.join(repoC, 'src'))
+        await fs.writeFile(
+            path.join(repoC, 'package.json'),
+            '{"name":"plain-service"}',
+        )
+
+        t.teardown(async () => {
+            await fs.remove(mockFleetRoot).catch(() => {})
+        })
+
+        process.env.FLEET_ROOT = mockFleetRoot
+
+        const slv = sinon.fake()
+        const model = new LibraryModel()
+        const bal = { slv } as any
+        const ste = null as any
+
+        await scanFleet(model, bal, ste)
+
+        t.true(slv.calledOnce, 'bal.slv must be invoked once')
+        const payload = slv.firstCall.args[0]
+        t.is(payload.libBit.idx, 'scan-fleet')
+        t.is(payload.libBit.val, 2)
+        t.deepEqual(payload.libBit.lst, [
+            '[astro-kahn-it-com/001.goblin-lore/apps/995.library]',
+            '[campc-it-com/000.repo-bot/apps/995.library]',
+        ])
+    },
+)
+
+test.serial(
+    'scanFleet -- discovers targeted package pivot when bal.src is provided',
+    async (t) => {
+        const mockFleetRoot = path.resolve(
+            process.cwd(),
+            'scratch_test_pivot_scan',
+        )
+        const repoA = path.join(mockFleetRoot, 'campc-it-com', '000.repo-bot')
+        const repoB = path.join(
+            mockFleetRoot,
+            'astro-kahn-it-com',
+            '001.goblin-lore',
+        )
+
+        // Repo A has packages/133.cloudflare; Repo B has packages/001.lore
+        await fs.ensureDir(path.join(repoA, 'packages', '133.cloudflare'))
+        await fs.writeFile(
+            path.join(repoA, 'package.json'),
+            '{"name":"repo-bot"}',
+        )
+
+        await fs.ensureDir(path.join(repoB, 'packages', '001.lore'))
+        await fs.writeFile(
+            path.join(repoB, 'package.json'),
+            '{"name":"goblin-lore"}',
+        )
+
+        t.teardown(async () => {
+            await fs.remove(mockFleetRoot).catch(() => {})
+        })
+
+        process.env.FLEET_ROOT = mockFleetRoot
+
+        const slv = sinon.fake()
+        const model = new LibraryModel()
+        const bal = { src: '[133.cloudflare]', slv } as any
+        const ste = null as any
+
+        await scanFleet(model, bal, ste)
+
+        t.true(slv.calledOnce)
+        const payload = slv.firstCall.args[0]
+        t.is(payload.libBit.idx, 'scan-fleet')
+        t.is(payload.libBit.val, 1)
+        t.deepEqual(payload.libBit.lst, [
+            '[campc-it-com/000.repo-bot/packages/133.cloudflare]',
+        ])
+    },
+)
+
+test.serial(
+    'scanFleet -- returns empty list cleanly when target pivot does not exist',
+    async (t) => {
+        const mockFleetRoot = path.resolve(
+            process.cwd(),
+            'scratch_test_empty_pivot',
+        )
+        const repoA = path.join(mockFleetRoot, 'campc-it-com', '000.repo-bot')
+        await fs.ensureDir(path.join(repoA, 'packages', '000.agent'))
+        await fs.writeFile(
+            path.join(repoA, 'package.json'),
+            '{"name":"repo-bot"}',
+        )
+
+        t.teardown(async () => {
+            await fs.remove(mockFleetRoot).catch(() => {})
+        })
+
+        process.env.FLEET_ROOT = mockFleetRoot
+
+        const slv = sinon.fake()
+        const model = new LibraryModel()
+        const bal = { src: '999.nonexistent', slv } as any
+        const ste = null as any
+
+        await scanFleet(model, bal, ste)
+
+        t.true(slv.calledOnce)
+        const payload = slv.firstCall.args[0]
+        t.is(payload.libBit.idx, 'scan-fleet')
+        t.is(payload.libBit.val, 0)
+        t.deepEqual(payload.libBit.lst, [])
+    },
+)
+
+test.serial(
+    'scanFleet -- handles direct root repository layout alongside nested org clusters',
+    async (t) => {
+        const mockFleetRoot = path.resolve(
+            process.cwd(),
+            'scratch_test_mixed_layout',
+        )
+        const directRepo = path.join(mockFleetRoot, '000.direct-server')
+        const nestedRepo = path.join(mockFleetRoot, 'campc-it-com', '000.repo-bot')
+
+        await fs.ensureDir(path.join(directRepo, 'apps', '995.library'))
+        await fs.writeFile(
+            path.join(directRepo, 'package.json'),
+            '{"name":"direct-server"}',
+        )
+
+        await fs.ensureDir(path.join(nestedRepo, 'apps', '995.library'))
+        await fs.writeFile(
+            path.join(nestedRepo, 'package.json'),
+            '{"name":"repo-bot"}',
+        )
+
+        t.teardown(async () => {
+            await fs.remove(mockFleetRoot).catch(() => {})
+        })
+
+        process.env.FLEET_ROOT = mockFleetRoot
+
+        const slv = sinon.fake()
+        const model = new LibraryModel()
+        const bal = { slv } as any
+        const ste = null as any
+
+        await scanFleet(model, bal, ste)
+
+        t.true(slv.calledOnce)
+        const payload = slv.firstCall.args[0]
+        t.is(payload.libBit.val, 2)
+        t.deepEqual(payload.libBit.lst, [
+            '[000.direct-server/apps/995.library]',
+            '[campc-it-com/000.repo-bot/apps/995.library]',
+        ])
+    },
+)
+
+test.serial(
+    'scanFleet -- fails closed to scan-fleet-error if fleet root cannot be resolved',
+    async (t) => {
+        cleanEnv()
+
+        const slv = sinon.fake()
+        const hunt = sinon.fake.resolves({})
+        const ste = { hunt } as any
+        const model = new LibraryModel()
+        const bal = { slv } as any
+
+        // Mock unresolvable root by temporarily overriding process.cwd
+        const originalCwd = process.cwd
+        process.cwd = () => '/home/runner/work/unresolvable/unresolvable'
+
+        try {
+            await scanFleet(model, bal, ste)
+        } finally {
+            process.cwd = originalCwd
+        }
+
+        t.true(slv.calledOnce)
+        const payload = slv.firstCall.args[0]
+        t.is(payload.libBit.idx, 'scan-fleet-error')
+        t.is(payload.libBit.src, 'NO_FLEET_ROOT')
+        t.is(payload.libBit.val, -1)
+        t.deepEqual(payload.libBit.lst, [])
+    },
+)
+
+test.serial(
     'scanFleet -- formats bracket paths and sorts alphabetically',
     async (t) => {
         const mockFleetRoot = path.resolve(
