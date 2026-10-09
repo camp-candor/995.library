@@ -1404,124 +1404,77 @@ export const progressLibrarySaga = async (
         }
     }
 
-    const sagaJournal = {
-        sagaId: `saga-fs-${Date.now()}`,
-        targetsCompleted: [] as string[],
-        targetsFailed: [] as string[],
-        backups: new Map<string, string>(),
-    }
-
-    if (ste) {
-        await ste.hunt(ActCns.UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: `>> [SAGA START] Synchronizing 995.library across ${targets.length} target(s)...`,
-        })
-    }
-
-    const EXCLUDED_NAMES = new Set([
-        '.env',
-        '.git',
-        'node_modules',
-        'dist',
-        '.wrangler',
-        '.tsbuildinfo',
-        'coverage',
-    ])
-
-    const copyFilter = (srcPath: string) => {
-        const base = path.basename(srcPath)
-        if (EXCLUDED_NAMES.has(base)) return false
-        if (base.startsWith('.env.')) return false
-        if (base.endsWith('.tsbuildinfo')) return false
-        return true
-    }
+    const sagaId = `saga-fs-${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const sagaJournal: SagaJournal = {
+        sagaId,
+        sourceDir,
+        status: 'RUNNING',
+        targetsCompleted: [],
+        targetsFailed: [],
+        backups: {},
+        records: {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    };
 
     for (const rawTarget of targets) {
-        const resolvedTarget = path.isAbsolute(rawTarget)
-            ? rawTarget
-            : path.resolve(process.cwd(), rawTarget)
+        const resolved = path.isAbsolute(rawTarget) ? rawTarget : path.resolve(process.cwd(), rawTarget);
+        sagaJournal.records[resolved] = { targetDir: resolved, state: 'PENDING' };
+    }
 
-        // =====================================================================
-        // PHASE 0: PRE-FLIGHT GIT WORKING TREE AUDIT GAUNTLET
-        // =====================================================================
-        const gitStatus = await checkGitWorkingTree(resolvedTarget)
+    await writeSagaJournal(sagaJournal);
+
+    let abortSaga = false;
+
+    for (const rawTarget of targets) {
+        const resolvedTarget = path.isAbsolute(rawTarget) ? rawTarget : path.resolve(process.cwd(), rawTarget);
+        const record = sagaJournal.records[resolvedTarget];
+
+        // PHASE 0: PRE-FLIGHT WORKING TREE GUARD
+        const gitStatus = await checkGitWorkingTree(resolvedTarget);
         if (!gitStatus.clean) {
+            record.state = 'FAILED';
+            record.error = 'DIRTY_WORKING_TREE';
+            sagaJournal.targetsFailed.push(`${resolvedTarget} (DIRTY_WORKING_TREE)`);
+            await writeSagaJournal(sagaJournal);
+
             if (ste) {
                 await ste.hunt(ActCns.UPDATE_CONSOLE, {
                     idx: 'cns00',
-                    src: '>> ==============================================================',
-                })
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: '>> [PRE-FLIGHT GUARD ALERT] TARGET WORKING TREE DIRTY',
-                })
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: `>> Target Directory : ${resolvedTarget}`,
-                })
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: `>> Git Repository   : ${gitStatus.repoRoot}`,
-                })
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: `>> Intersecting Dels: ${gitStatus.intersectingFiles.length} uncommitted file(s) detected!`,
-                })
-                for (const file of gitStatus.intersectingFiles) {
-                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                        idx: 'cns00',
-                        src: `>>   [DIRTY] ${file}`,
-                    })
-                }
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: '>> [SAFETY ABORT] Directory staging halted. Existing code preserved.',
-                })
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: '>> ==============================================================',
-                })
+                    src: `>> [SAGA CIRCUIT BREAKER] Working tree dirty on ${resolvedTarget}. Aborting fleet propagation.`,
+                });
             }
-
-            sagaJournal.targetsFailed.push(`${resolvedTarget} (DIRTY_WORKING_TREE)`)
-            break
+            abortSaga = true;
+            break;
         }
 
-        // =====================================================================
-        // PHASE 1: ISOLATED STAGING & ZERO-TRUST FILTRATION
-        // =====================================================================
         const nonce = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-        let stagingDir = '';
         const backupDir = path.join(path.dirname(resolvedTarget), `.tmp_backup_995_library_${nonce}`);
+        record.backupDir = backupDir;
 
+        // PHASE 1: ISOLATED STAGING & ZERO-TRUST FILTRATION
         try {
-            if (ste) {
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: `>> [STAGING] Staging payload beside target: ${resolvedTarget}`,
-                });
-            }
-
             const staged = await stageLibraryPayload(sourceDir, resolvedTarget, nonce);
-            stagingDir = staged.stagingDir;
+            record.stagingDir = staged.stagingDir;
+            record.state = 'STAGED';
+            await writeSagaJournal(sagaJournal);
 
-            if (ste) {
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: `>> [STAGING] [OK] Filtered payload staged at: ${stagingDir}`,
-                });
+            // PHASE 2: ATOMIC INODE PROMOTION & SWAP
+            // Retain backup path in journal for multi-target compensation
+            const targetExists = await fs.pathExists(resolvedTarget);
+            if (targetExists) {
+                sagaJournal.backups[resolvedTarget] = backupDir;
             }
 
-            // =================================================================
-            // PHASE 2: ATOMIC INODE PROMOTION & SWAP
-            // =================================================================
-            const swapResult = await swapAtomicInodes(stagingDir, resolvedTarget, backupDir, ste);
+            const swapResult = await swapAtomicInodes(record.stagingDir, resolvedTarget, backupDir, ste);
 
             if (!swapResult.promoted) {
-                throw swapResult.error || new Error(`[SWAP_FAULT] Inode swap failed on ${resolvedTarget}`);
+                throw swapResult.error || new Error(`Inode swap promotion failed on ${resolvedTarget}`);
             }
 
+            record.state = 'COMPLETED';
             sagaJournal.targetsCompleted.push(resolvedTarget);
+            await writeSagaJournal(sagaJournal);
 
             if (ste) {
                 await ste.hunt(ActCns.UPDATE_CONSOLE, {
@@ -1530,36 +1483,178 @@ export const progressLibrarySaga = async (
                 });
             }
         } catch (err: any) {
+            record.state = 'FAILED';
+            record.error = err.message;
+            sagaJournal.targetsFailed.push(resolvedTarget);
+            await writeSagaJournal(sagaJournal);
+
             if (ste) {
                 await ste.hunt(ActCns.UPDATE_CONSOLE, {
                     idx: 'cns00',
-                    src: `>> [ERROR] Staging or swap failed on ${resolvedTarget}: ${err.message}`,
+                    src: `>> [FAULT DETECTED] Failure on ${resolvedTarget}: ${err.message}. Initiating compensation rollback...`,
                 });
             }
 
-            sagaJournal.targetsFailed.push(resolvedTarget);
+            abortSaga = true;
             break;
         }
     }
 
-    const isSuccess = sagaJournal.targetsFailed.length === 0;
+    if (abortSaga) {
+        // Multi-Target Reverse Compensation Routing
+        const compensationOutcome = await rollbackSagaJournal(sagaJournal, ste);
+        const finalStatus = compensationOutcome.compensated ? 'COMPENSATED' : 'TORN';
 
-    if (ste) {
-        await ste.hunt(ActCns.UPDATE_CONSOLE, {
-            idx: 'cns00',
-            src: `>> [SAGA FINISHED] Completed: ${sagaJournal.targetsCompleted.length} | Failed: ${sagaJournal.targetsFailed.length}`,
-        })
+        if (bal && bal.slv) {
+            bal.slv({
+                libBit: {
+                    idx: 'progress-library-saga-error',
+                    src: finalStatus,
+                    val: sagaJournal.targetsCompleted.length,
+                    dat: sagaJournal,
+                },
+            });
+        }
+        return cpy;
     }
+
+    await finalizeSagaJournal(sagaJournal);
 
     if (bal && bal.slv) {
         bal.slv({
             libBit: {
-                idx: isSuccess ? 'progress-library-saga' : 'progress-library-saga-error',
+                idx: 'progress-library-saga',
+                src: 'COMPLETED',
                 val: sagaJournal.targetsCompleted.length,
                 dat: sagaJournal,
             },
-        })
+        });
     }
 
-    return cpy
+    return cpy;
+
+
 }
+
+
+export interface SagaTargetRecord {
+    targetDir: string;
+    backupDir?: string;
+    stagingDir?: string;
+    state: 'PENDING' | 'STAGED' | 'SWAPPED' | 'COMPLETED' | 'FAILED' | 'ROLLED_BACK';
+    error?: string;
+}
+
+export interface SagaJournal {
+    sagaId: string;
+    sourceDir: string;
+    status: 'RUNNING' | 'COMPLETED' | 'TORN' | 'COMPENSATED';
+    targetsCompleted: string[];
+    targetsFailed: string[];
+    backups: Record<string, string>;
+    records: Record<string, SagaTargetRecord>;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export const getJournalPath = (): string => {
+    const path = require('path');
+    return path.resolve(process.cwd(), 'data', 'saga', 'active.json');
+};
+
+export const writeSagaJournal = async (journal: SagaJournal): Promise<void> => {
+    const fs = require('fs-extra');
+    const path = require('path');
+    const journalFile = getJournalPath();
+    await fs.ensureDir(path.dirname(journalFile));
+    journal.updatedAt = new Date().toISOString();
+    await fs.writeJson(journalFile, journal, { spaces: 2 });
+};
+
+export const rollbackSagaJournal = async (
+    journal: SagaJournal,
+    ste?: State,
+): Promise<{ compensated: boolean; unrecoverableErrors: string[] }> => {
+    const fs = require('fs-extra');
+    const unrecoverableErrors: string[] = [];
+
+    if (ste) {
+        await ste.hunt(ActCns.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: `>> [COMPENSATION INITIATED] Reverting ${journal.targetsCompleted.length} target(s) backwards in time...`,
+        });
+    }
+
+    // Reverse-chronological iteration
+    const reversedCompleted = [...journal.targetsCompleted].reverse();
+
+    for (const targetDir of reversedCompleted) {
+        const backupDir = journal.backups[targetDir];
+        const record = journal.records[targetDir];
+
+        if (backupDir && (await fs.pathExists(backupDir))) {
+            try {
+                if (await fs.pathExists(targetDir)) {
+                    await fs.remove(targetDir);
+                }
+                await fs.rename(backupDir, targetDir);
+
+                if (record) {
+                    record.state = 'ROLLED_BACK';
+                }
+
+                if (ste) {
+                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [COMPENSATION] [OK] Reverted target to pre-saga backup: ${targetDir}`,
+                    });
+                }
+            } catch (err: any) {
+                const errMsg = `Failed to rollback target '${targetDir}' from '${backupDir}': ${err.message}`;
+                unrecoverableErrors.push(errMsg);
+                if (ste) {
+                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [COMPENSATION] [FAIL] ${errMsg}`,
+                    });
+                }
+            }
+        }
+    }
+
+    // Clean up any remaining staging directories across all records
+    for (const targetDir in journal.records) {
+        const rec = journal.records[targetDir];
+        if (rec.stagingDir && (await fs.pathExists(rec.stagingDir))) {
+            await fs.remove(rec.stagingDir).catch(() => {});
+        }
+    }
+
+    journal.status = unrecoverableErrors.length === 0 ? 'COMPENSATED' : 'TORN';
+    await writeSagaJournal(journal);
+
+    return {
+        compensated: unrecoverableErrors.length === 0,
+        unrecoverableErrors,
+    };
+};
+
+export const finalizeSagaJournal = async (journal: SagaJournal): Promise<void> => {
+    const fs = require('fs-extra');
+    // Purge temporary backups
+    for (const targetDir in journal.backups) {
+        const backupDir = journal.backups[targetDir];
+        if (backupDir && (await fs.pathExists(backupDir))) {
+            await fs.remove(backupDir).catch(() => {});
+        }
+    }
+
+    journal.status = 'COMPLETED';
+    await writeSagaJournal(journal);
+
+    // Remove active journal file upon clean completion
+    const journalFile = getJournalPath();
+    if (await fs.pathExists(journalFile)) {
+        await fs.remove(journalFile).catch(() => {});
+    }
+};
