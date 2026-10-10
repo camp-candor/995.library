@@ -7,7 +7,6 @@ import type TermBit from '../fce/term.bit'
 import type { TerminalModel } from '../../80.terminal.unit/terminal.model'
 import * as COLOR from '../../val/console-color'
 
-let bit: any
 let renderScheduled = false
 
 export const initConsole = (cpy: ConsoleModel, _bal: ConsoleBit, _ste: State) => {
@@ -84,7 +83,7 @@ export const updateConsole = async (
     bal: ConsoleBit,
     ste: State,
 ) => {
-    bit = await ste.hunt(ActCns.READ_CONSOLE, { idx: bal.idx })
+    const bit = await ste.hunt(ActCns.READ_CONSOLE, { idx: bal.idx })
     const dat: TermBit = bit?.cnsBit?.dat
 
     if (bal.src == null) bal.src = ''
@@ -169,12 +168,12 @@ export const readConsole = async (
 ) => {
     const slv = bal.slv
     if (bal.idx == null) bal.idx = 'can00'
-    bit = await ste.hunt(ActCol.READ_COLLECT, {
+    const bit = await ste.hunt(ActCol.READ_COLLECT, {
         idx: bal.idx,
         bit: ActCns.CREATE_CONSOLE,
     })
     if (slv != null) {
-        slv({ cnsBit: { idx: 'read-console', dat: bit.clcBit.dat } })
+        slv({ cnsBit: { idx: 'read-console', dat: bit?.clcBit?.dat } })
     }
     return cpy
 }
@@ -184,7 +183,7 @@ export const writeConsole = async (
     bal: ConsoleBit,
     ste: State,
 ) => {
-    bit = await ste.hunt(ActCol.WRITE_COLLECT, {
+    const bit = await ste.hunt(ActCol.WRITE_COLLECT, {
         idx: bal.idx,
         src: bal.src,
         dat: bal.dat,
@@ -193,7 +192,7 @@ export const writeConsole = async (
     await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: bal.idx, src: bal.src })
 
     if (bal.slv != null) {
-        bal.slv({ cnsBit: { idx: 'write-console', dat: bit.clcBit.dat } })
+        bal.slv({ cnsBit: { idx: 'write-console', dat: bit?.clcBit?.dat } })
     }
     return cpy
 }

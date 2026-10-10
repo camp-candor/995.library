@@ -18,8 +18,6 @@ import * as ActLib from '../library.action'
 
 let bit, val, idx, dex, lst, dat
 
-const exec = require('child_process').exec
-
 export const ZERO_TRUST_EXCLUDED_NAMES = new Set([
     '.env',
     '.git',
@@ -597,7 +595,7 @@ export const launchLibrary = async (
 ) => {
     const fs = require('fs')
     const path = require('path')
-    const { exec } = require('child_process')
+    const { execFile } = require('child_process')
 
     const filePath = path.resolve(process.cwd(), 'data/launch.txt')
 
@@ -609,20 +607,24 @@ export const launchLibrary = async (
             .filter((url: string) => url.length > 0)
 
         for (const url of urls) {
-            let command
+            let cmd: string
+            let args: string[]
             switch (process.platform) {
                 case 'darwin':
-                    command = `open "${url}"`
+                    cmd = 'open'
+                    args = [url]
                     break
                 case 'win32':
-                    command = `start "" "${url}"`
+                    cmd = 'cmd.exe'
+                    args = ['/c', 'start', '', url]
                     break
                 default:
-                    command = `xdg-open "${url}"`
+                    cmd = 'xdg-open'
+                    args = [url]
                     break
             }
 
-            exec(command, (error: any) => {
+            execFile(cmd, args, (error: any) => {
                 if (error) {
                     console.error(`Error opening url: ${url}`, error)
                 }
