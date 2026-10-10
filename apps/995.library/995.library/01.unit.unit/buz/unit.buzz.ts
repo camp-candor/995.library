@@ -259,8 +259,8 @@ export const createUnit = async (
             ? resolvedSrc
             : path.join(resolvedSrc, unitFolder)
     } else {
-        // Direct storehouse emission default
-        targetUnitDir = path.join(repoRoot, 'packages', unitFolder)
+        // Direct storehouse emission default into root data/unit
+        targetUnitDir = path.join(repoRoot, 'data', 'unit', unitFolder)
     }
 
     function capitalizeFirstLetter(string: string) {
@@ -354,10 +354,14 @@ export const createUnit = async (
     // 7. Automated Manifest (BEE.ts) Re-Wiring Hook
     if (ste && bal.dat?.autoWire !== false) {
         const parentPkgDir = path.dirname(targetUnitDir)
-        try {
-            await ste.hunt(ActLib.UPDATE_LIBRARY, { src: parentPkgDir })
-        } catch {
-            // Non-fatal if parent workspace lacks BEE template
+        const isDataUnit =
+            path.resolve(parentPkgDir) === path.resolve(repoRoot, 'data', 'unit')
+        if (!isDataUnit) {
+            try {
+                await ste.hunt(ActLib.UPDATE_LIBRARY, { src: parentPkgDir })
+            } catch {
+                // Non-fatal if parent workspace lacks BEE template
+            }
         }
     }
 

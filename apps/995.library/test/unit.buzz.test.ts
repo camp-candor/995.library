@@ -214,6 +214,45 @@ test.serial(
 )
 
 test.serial(
+    'createUnit -- routes to data/unit by default when bal.src is omitted',
+    async (t) => {
+        let repoRoot = process.cwd()
+        while (
+            repoRoot &&
+            !(
+                fs.existsSync(path.join(repoRoot, 'apps')) &&
+                fs.existsSync(path.join(repoRoot, 'packages'))
+            )
+        ) {
+            const parent = path.dirname(repoRoot)
+            if (parent === repoRoot) break
+            repoRoot = parent
+        }
+
+        const testVerb = 'compass'
+        const expectedRelDir = `data/unit/00.${testVerb}.unit`
+        const expectedTargetDir = path.join(repoRoot, expectedRelDir)
+        const bal = makeBal(testVerb) // bal.src is undefined
+
+        t.teardown(async () => {
+            await fs.remove(expectedTargetDir).catch(() => {})
+        })
+
+        await createUnit(makeModel(), bal, ste)
+
+        t.true(bal.slv.calledOnce, 'bal.slv must resolve immediately')
+        const result = bal.slv.firstCall.args[0]
+        t.is(result.untBit.idx, 'create-unit')
+        t.true(
+            result.untBit.src.startsWith(expectedRelDir),
+            `Expected ${expectedRelDir}, got: ${result.untBit.src}`,
+        )
+        t.true(fs.existsSync(expectedTargetDir), 'Target unit must exist inside data/unit')
+        t.true(fs.existsSync(path.join(expectedTargetDir, 'compass.unit.ts')))
+    },
+)
+
+test.serial(
     'updateUnit -- resiliently injects action, reducer, buzzer, and buzz into formatted unit files',
     async (t) => {
         let repoRoot = process.cwd()

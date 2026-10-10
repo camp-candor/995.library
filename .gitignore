@@ -72,3 +72,4 @@ apps/995.library/scratch_*
 data/saga/active.json
 *.Atomic-Staging.md
 903.Atomic-Staging.md
+/data/flat

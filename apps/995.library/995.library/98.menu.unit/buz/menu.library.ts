@@ -230,7 +230,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             })
             idx = bit.putBit.src
 
-            var updateBit = await ste.hunt(ActUnt.CREATE_UNIT, { idx })
+            var updateBit = await ste.hunt(ActUnt.CREATE_UNIT, { idx, src: 'data/unit' })
 
             bit = await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
 
@@ -528,7 +528,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             })
             idx = bit.putBit.src
 
-            var updateBit = await ste.hunt(ActUnt.CREATE_UNIT, { idx })
+            var updateBit = await ste.hunt(ActUnt.CREATE_UNIT, { idx, src: 'data/unit' })
 
             bit = await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
 
