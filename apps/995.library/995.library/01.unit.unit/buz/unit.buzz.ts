@@ -194,15 +194,20 @@ export const flattenUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
     return cpy
 }
 
-export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
-    const rawNom = bal.idx || 'alligator'
-
+export const createUnit = async (
+    cpy: UnitModel,
+    bal: UnitBit,
+    ste: State,
+): Promise<UnitModel> => {
     const FS = require('fs-extra')
     const path = require('path')
     const doT = require('dot')
 
+    // 1. Resolve Root Repository Context
     const repoRoot = findRepoRoot()
+    const rawNom = bal.idx || 'alligator'
 
+    // 2. Discover Template Directory with Robust Multi-Candidate Discovery
     const templateCandidates = [
         path.join(repoRoot, 'data', '00.sim.unit'),
         path.join(repoRoot, 'apps', '995.library', 'data', '00.sim.unit'),
@@ -231,6 +236,7 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
         return cpy
     }
 
+    // 3. Define Unit Identifiers & Prefix
     let num = '00'
     let nom = rawNom.toLowerCase()
 
@@ -242,6 +248,7 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
 
     const unitFolder = `${num}.${nom}.unit`
 
+    // 4. Parameterized Canonical Target Resolution
     let targetUnitDir: string
     if (bal.src) {
         const resolvedSrc = path.isAbsolute(bal.src)
@@ -252,6 +259,7 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
             ? resolvedSrc
             : path.join(resolvedSrc, unitFolder)
     } else {
+        // Direct storehouse emission default
         targetUnitDir = path.join(repoRoot, 'packages', unitFolder)
     }
 
@@ -288,13 +296,15 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
         })
     }
 
-    function getTemplateFiles(dir: string): string[] {
-        const entries = FS.readdirSync(dir, { withFileTypes: true })
+    // 5. Asynchronous Recursive Template Ingestion
+    async function getTemplateFiles(dir: string): Promise<string[]> {
+        const entries = await FS.readdir(dir, { withFileTypes: true })
         let files: string[] = []
         for (const entry of entries) {
             const fullPath = path.join(dir, entry.name)
             if (entry.isDirectory()) {
-                files = files.concat(getTemplateFiles(fullPath))
+                const subFiles = await getTemplateFiles(fullPath)
+                files = files.concat(subFiles)
             } else if (entry.isFile()) {
                 files.push(fullPath)
             }
@@ -302,8 +312,9 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
         return files
     }
 
-    const templateFiles = getTemplateFiles(templateDir)
+    const templateFiles = await getTemplateFiles(templateDir)
 
+    // 6. Compile and Output Asynchronously
     for (const filePath of templateFiles) {
         const relFromTemplate = path.relative(templateDir, filePath)
 
@@ -340,15 +351,17 @@ export const createUnit = async (cpy: UnitModel, bal: UnitBit, ste: State) => {
         .relative(repoRoot, targetUnitDir)
         .replace(/\\/g, '/')
 
+    // 7. Automated Manifest (BEE.ts) Re-Wiring Hook
     if (ste && bal.dat?.autoWire !== false) {
         const parentPkgDir = path.dirname(targetUnitDir)
         try {
             await ste.hunt(ActLib.UPDATE_LIBRARY, { src: parentPkgDir })
         } catch {
-            // Ignore non-critical BEE update issues in third-party targets
+            // Non-fatal if parent workspace lacks BEE template
         }
     }
 
+    // 8. Deterministic Zero-Delay Immediate Resolution
     if (bal.slv != null) {
         bal.slv({
             untBit: {
