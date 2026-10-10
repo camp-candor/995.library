@@ -905,6 +905,37 @@ export const resolveFleetRoot = (
     const root = path.parse(current).root
 
     while (current && current !== root) {
+        // Check for Cauldron Sentinel Anchor
+        const cauldronAnchor = path.join(
+            current,
+            'camp-candor-cauldron',
+            'versions.json',
+        )
+        if (fs.existsSync(cauldronAnchor)) {
+            return current
+        }
+
+        const directAnchor = path.join(current, 'versions.json')
+        if (
+            fs.existsSync(directAnchor) &&
+            path.basename(current) === 'camp-candor-cauldron'
+        ) {
+            return path.resolve(current, '..')
+        }
+
+        // Check for multi-tenant organization markers or thematic clusters
+        const hasOrgClusters =
+            fs.existsSync(path.join(current, 'campc-it-com')) ||
+            fs.existsSync(path.join(current, 'cauldron-it-com')) ||
+            fs.existsSync(path.join(current, 'astro-kahn-it-com')) ||
+            fs.existsSync(path.join(current, 'slopratchet.com')) ||
+            (fs.existsSync(path.join(current, '00.governance')) &&
+                fs.existsSync(path.join(current, '01.canon')))
+
+        if (hasOrgClusters) {
+            return current
+        }
+
         // CI Runner Guard: bypass /home/runner/work without sentinels
         const normalizedCurrent = current
             .replace(/^[a-zA-Z]:/, '')
@@ -917,37 +948,6 @@ export const resolveFleetRoot = (
             normalizedCurrent.startsWith('/home/runner/')
 
         if (!isCiRunnerPath) {
-            // Check for Cauldron Sentinel Anchor
-            const cauldronAnchor = path.join(
-                current,
-                'camp-candor-cauldron',
-                'versions.json',
-            )
-            if (fs.existsSync(cauldronAnchor)) {
-                return current
-            }
-
-            const directAnchor = path.join(current, 'versions.json')
-            if (
-                fs.existsSync(directAnchor) &&
-                path.basename(current) === 'camp-candor-cauldron'
-            ) {
-                return path.resolve(current, '..')
-            }
-
-            // Check for multi-tenant organization markers or thematic clusters
-            const hasOrgClusters =
-                fs.existsSync(path.join(current, 'campc-it-com')) ||
-                fs.existsSync(path.join(current, 'cauldron-it-com')) ||
-                fs.existsSync(path.join(current, 'astro-kahn-it-com')) ||
-                fs.existsSync(path.join(current, 'slopratchet.com')) ||
-                (fs.existsSync(path.join(current, '00.governance')) &&
-                    fs.existsSync(path.join(current, '01.canon')))
-
-            if (hasOrgClusters) {
-                return current
-            }
-
             // Generic 'work' workspace directory name match
             if (
                 path.basename(current).toLowerCase() === 'work' ||
