@@ -29,12 +29,12 @@ export const loreGears = async (cpy: GearsModel, bal: GearsBit, ste: State) => {
     if (FS.existsSync(fullPath)) {
         await ste.hunt(ActCns.UPDATE_CONSOLE, {
             idx: 'cns00',
-            src: `🛑 'File found!'.`,
+            src: `>> 'File found!'.`,
         })
     } else {
         await ste.hunt(ActCns.UPDATE_CONSOLE, {
             idx: 'cns00',
-            src: `🛑 'File does not exist!'.`,
+            src: `>> 'File does not exist!'.`,
         })
         var bit = await ste.hunt(ActGer.CREATE_GEARS, {
             src: bal.src,
