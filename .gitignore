@@ -67,3 +67,8 @@ examples/
 # Library Snapshots & Scaffold Templates
 !data/flat/
 !data/unit/
+.tmp_*
+apps/995.library/scratch_*
+data/saga/active.json
+*.Atomic-Staging.md
+903.Atomic-Staging.md
