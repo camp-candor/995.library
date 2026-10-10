@@ -170,8 +170,9 @@ const init = async () => {
 
         await new Promise((resolve) => setTimeout(resolve, 10))
 
-        await LIBRARY.hunt(MENU_ACTION_LIBRARY.PRINT_MENU, {
-            src: '[OK] Master Bus Initialized',
+        await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [OK] Master Bus Initialized',
         })
 
         // 3. Dynamic Package Injection & Bus Wiring
@@ -212,9 +213,10 @@ const init = async () => {
                     !fs.existsSync(menuActionPath)
                 ) {
                     // Headless pivot without visual menu unit
-                    console.log(
-                        `>> [INFO] Mounted headless pivot: [${pkg.name}] as global.${pkg.globalKey}`,
-                    )
+                    await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [INFO] Mounted headless pivot: [${pkg.name}] as global.${pkg.globalKey}`,
+                    })
                     continue
                 }
 
@@ -239,13 +241,15 @@ const init = async () => {
                     },
                 })
 
-                console.log(
-                    `>> [OK] Mounted UI Pivot: [${pkg.name}] -> ${pkg.menuTitle}`,
-                )
+                await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [OK] Mounted UI Pivot: [${pkg.name}] -> ${pkg.menuTitle}`,
+                })
             } catch (err: any) {
-                console.error(
-                    `:: [WARN] Skipping pivot [${pkg.name}]: ${err.message}`,
-                )
+                await LIBRARY.hunt(CONSOLE_ACTION_LIBRARY.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [WARN] Skipping pivot [${pkg.name}]: ${err.message}`,
+                })
             }
         }
 

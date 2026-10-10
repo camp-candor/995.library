@@ -45,7 +45,7 @@ export const openChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
 
     const form = blessed.form({
         parent: screen,
-        keys: true,
+        keys: false,
         mouse: true,
         left: net.left,
         top: net.top,
@@ -90,6 +90,7 @@ export const openChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
         })
 
         btn.on('focus', () => {
+            form._selected = btn
             if (dat.cb) {
                 dat.cb(itemText)
             }

@@ -77,6 +77,22 @@ laws:
   (missing directories, syntax faults, malformed manifests) is not
   production-ready.
 
+### Law 5: Curses Viewport Logging Isolation & Green Column Telemetry (ABSOLUTE REQUIREMENT)
+
+- Once Blessed curses initializes (from `INIT_LIBRARY` / `INIT_TERMINAL`
+  onward), **writing directly to standard output or standard error via
+  `console.log` or `console.error` is strictly prohibited**.
+- Uncoordinated writes to stdout bypass the curses screen buffer and render as
+  terminal-default white text across the screen, colliding with and corrupting
+  the Blessed UI layout and navigation forms.
+- **All runtime telemetry, bus initialization pings, package mounting notices,
+  headless pivot indicators, and warnings must be routed directly to the
+  right-hand console column (`cns00`)** via `[Console action] Update Console`
+  (`ActCns.UPDATE_CONSOLE`).
+- The `cns00` console log widget renders all telemetry deterministically in
+  **green (`COLOR.GREEN`)** using pure 7-bit ASCII status tokens (`>> [OK]`,
+  `>> [INFO]`, `:: [WARN]`).
+
 ---
 
 ## 2. Monorepo Topology & Workspace Roles
@@ -272,3 +288,7 @@ If you are an AI agent modifying this codebase, **READ THIS SECTION CAREFULLY**:
    the existing `01.unit.unit` or manually adhere to the deterministic stubs.
 5. **No `setTimeout` or `debugger`**: Your code should be fully non-blocking and
    observable. Emits to the console (`cns00`) are your logging mechanism.
+6. **No `console.log` After Terminal Initialization**: Once Blessed curses is
+   active, never write directly to stdout via `console.log` or `console.error`.
+   All telemetry must be dispatched to the right-hand console column (`cns00`)
+   via `ActCns.UPDATE_CONSOLE` so it renders in green (`COLOR.GREEN`).

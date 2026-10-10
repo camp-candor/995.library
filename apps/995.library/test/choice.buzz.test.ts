@@ -96,3 +96,148 @@ test('openChoice -- binds vertical navigation keys and unbinds on submit', (t) =
     t.true(slv.calledOnce, 'Must resolve bal.slv upon submit')
     t.is(slv.firstCall.args[0].chcBit.src, 'OPTION A')
 })
+
+test('openChoice -- single-step navigation invariant (keys: false on form avoids duplicate key routing)', (t) => {
+    const model = new ChoiceModel()
+    const slv = sinon.fake()
+    const keyFake = sinon.fake()
+
+    const mockButton = {
+        on: sinon.fake(),
+        focus: sinon.fake(),
+        content: 'OPTION A',
+        index: 1,
+    }
+
+    const mockForm = {
+        _selected: mockButton,
+        focusPrevious: sinon.fake(),
+        focusNext: sinon.fake(),
+        destroy: sinon.fake(),
+        on: sinon.fake(),
+    }
+
+    const formFake = sinon.fake.returns(mockForm)
+    const mockBlessed = {
+        form: formFake,
+        button: sinon.fake.returns(mockButton),
+    }
+
+    const mockScreen = {
+        key: keyFake,
+        unkey: sinon.fake(),
+        render: sinon.fake(),
+    }
+
+    const ste = {
+        value: {
+            terminal: {
+                blessed: mockBlessed,
+                screen: mockScreen,
+            },
+        },
+    } as any
+
+    const bal = {
+        idx: 'test-choice',
+        lst: ['OPTION A', 'OPTION B', 'OPTION C'],
+        slv,
+    } as any
+
+    openChoice(model, bal, ste)
+
+    // Form must have keys: false to prevent Blessed Form from intercepting arrow keys
+    // which would cause double-jumping when combined with screen.key
+    t.true(formFake.calledOnce, 'Form must be created')
+    t.is(
+        formFake.firstCall.args[0].keys,
+        false,
+        'Form must be initialized with keys: false to prevent duplicate keypress routing',
+    )
+
+    // Extract registered up/down key handlers
+    const downCall = keyFake.args.find(
+        (args) => Array.isArray(args[0]) && args[0].includes('down'),
+    )
+    const upCall = keyFake.args.find(
+        (args) => Array.isArray(args[0]) && args[0].includes('up'),
+    )
+
+    t.truthy(downCall, 'Down key handler must be registered')
+    t.truthy(upCall, 'Up key handler must be registered')
+
+    const handleDown = downCall[1]
+    const handleUp = upCall[1]
+
+    // Verify exactly one step per keypress (no skipping)
+    handleDown()
+    t.is(mockForm.focusNext.callCount, 1, 'First down stroke must advance focus by exactly 1 item')
+
+    handleDown()
+    t.is(mockForm.focusNext.callCount, 2, 'Second down stroke must advance focus by exactly 1 item')
+
+    handleUp()
+    t.is(mockForm.focusPrevious.callCount, 1, 'Up stroke must move focus backward by exactly 1 item')
+})
+
+test('openChoice -- synchronizes form._selected on button focus event', (t) => {
+    const model = new ChoiceModel()
+    const slv = sinon.fake()
+
+    const buttonEventHandlers: Record<string, Function> = {}
+    const mockButton = {
+        on: (event: string, handler: Function) => {
+            buttonEventHandlers[event] = handler
+        },
+        focus: sinon.fake(),
+        content: 'OPTION B',
+        index: 2,
+    }
+
+    const mockForm: any = {
+        _selected: null,
+        focusPrevious: sinon.fake(),
+        focusNext: sinon.fake(),
+        destroy: sinon.fake(),
+        on: sinon.fake(),
+    }
+
+    const mockBlessed = {
+        form: sinon.fake.returns(mockForm),
+        button: sinon.fake.returns(mockButton),
+    }
+
+    const mockScreen = {
+        key: sinon.fake(),
+        unkey: sinon.fake(),
+        render: sinon.fake(),
+    }
+
+    const ste = {
+        value: {
+            terminal: {
+                blessed: mockBlessed,
+                screen: mockScreen,
+            },
+        },
+    } as any
+
+    const bal = {
+        idx: 'test-choice',
+        lst: ['OPTION A', 'OPTION B'],
+        slv,
+    } as any
+
+    openChoice(model, bal, ste)
+
+    t.truthy(buttonEventHandlers['focus'], 'Button focus listener must be attached')
+
+    // Simulate focus event on button
+    buttonEventHandlers['focus']()
+
+    t.is(
+        mockForm._selected,
+        mockButton,
+        'form._selected must synchronize with the active focused button',
+    )
+})
