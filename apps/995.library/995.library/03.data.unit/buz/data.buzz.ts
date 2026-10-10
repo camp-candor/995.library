@@ -1,48 +1,72 @@
-//const ffmpeg = require("fluent-ffmpeg");
-
-export const initData = (cpy: DataModel, bal: DataBit, ste: State) => {
-    debugger
-    return cpy
-}
-
-export const updateData = (cpy: DataModel, bal: DataBit, ste: State) => {
-    return cpy
-}
-
-export const frameData = (cpy: DataModel, bal: DataBit, ste: State) => {
-    const videoFile = '../films/' + bal.src
-    const outputDir = '../frames'
-
-    const FS = require('fs-extra')
-
-    FS.emptyDirSync(outputDir)
-
-    // Create output directory if it doesn't exist
-    if (!FS.existsSync(outputDir)) {
-        FS.mkdirSync(outputDir)
-    }
-
-    //  var itm = new ffmpeg(videoFile)
-    //      .on("end", () => {
-
-    //          console.log("Frames extracted successfully!");
-
-    //           bal.slv({ palBit: { idx: "frame-pixel" } });
-    //       })
-    //       .on("error", (err) => {
-    //           console.error("An error occurred:", err);
-    //       })
-    //       .takeScreenshots({
-    //           count: 48, // Number of frames to extract
-    //            filename: "frame.png", // Output filename pattern
-    //           folder: outputDir, // Output directory
-    //       });
-
-    // itm.setFfmpegPath(ffmpegPath);
-
-    return cpy
-}
-
+import * as ActCns from '../../83.console.unit/console.action'
 import type { DataModel } from '../data.model'
 import type DataBit from '../fce/data.bit'
 import type State from '../../99.core/state'
+
+export const initData = async (
+    cpy: DataModel,
+    bal: DataBit,
+    ste: State,
+): Promise<DataModel> => {
+    if (ste && typeof ste.hunt === 'function') {
+        await ste.hunt(ActCns.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [DATA:INIT] [OK] Initializing media data plane boundaries...',
+        }).catch(() => {})
+    }
+
+    if (bal && bal.slv != null) {
+        bal.slv({ datBit: { idx: 'init-data' } })
+    }
+
+    return cpy
+}
+
+export const updateData = async (
+    cpy: DataModel,
+    bal: DataBit,
+    ste: State,
+): Promise<DataModel> => {
+    if (ste && typeof ste.hunt === 'function') {
+        await ste.hunt(ActCns.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: '>> [DATA:UPDATE] [OK] Updating media data plane configuration...',
+        }).catch(() => {})
+    }
+
+    if (bal && bal.slv != null) {
+        bal.slv({ datBit: { idx: 'update-data' } })
+    }
+
+    return cpy
+}
+
+export const frameData = async (
+    cpy: DataModel,
+    bal: DataBit,
+    ste: State,
+): Promise<DataModel> => {
+    const videoFile = bal?.src ? `../films/${bal.src}` : '../films/default.mp4'
+    const outputDir = bal?.dat?.outputDir || '../frames'
+    const targetFrames = bal?.val || 48
+
+    if (ste && typeof ste.hunt === 'function') {
+        await ste.hunt(ActCns.UPDATE_CONSOLE, {
+            idx: 'cns00',
+            src: `>> [DATA:FRAME] [PREP] Source: ${videoFile} | Target frames: ${targetFrames}`,
+        }).catch(() => {})
+    }
+
+    if (bal && bal.slv != null) {
+        bal.slv({
+            datBit: {
+                idx: 'frame-data',
+                src: outputDir,
+                val: targetFrames,
+            },
+        })
+    }
+
+    return cpy
+}
+
