@@ -106,6 +106,8 @@ test.serial(
     },
 )
 
+
+
 test.serial(
     'createUnit -- scaffolds templates deterministically with zero artificial latency',
     async (t) => {
@@ -172,6 +174,44 @@ test.serial(
                 `Missing scaffolded file: ${relFile}`,
             )
         }
+    },
+)
+
+test.serial(
+    'createUnit -- routes directly to active package workspace when src is provided',
+    async (t) => {
+        let repoRoot = process.cwd()
+        while (
+            repoRoot &&
+            !(
+                fs.existsSync(path.join(repoRoot, 'apps')) &&
+                fs.existsSync(path.join(repoRoot, 'packages'))
+            )
+        ) {
+            const parent = path.dirname(repoRoot)
+            if (parent === repoRoot) break
+            repoRoot = parent
+        }
+
+        const scratchPkg = path.join(repoRoot, 'scratch_target_pkg')
+        await fs.ensureDir(scratchPkg)
+
+        const testVerb = 'radar'
+        const bal = makeBal(testVerb, scratchPkg)
+        const expectedTargetDir = path.join(scratchPkg, `00.${testVerb}.unit`)
+
+        t.teardown(async () => {
+            await fs.remove(scratchPkg).catch(() => {})
+        })
+
+        const startTime = Date.now()
+        await createUnit(makeModel(), bal, ste)
+        const elapsed = Date.now() - startTime
+
+        t.true(bal.slv.calledOnce, 'bal.slv must resolve immediately')
+        t.true(elapsed < 1000, 'Must execute without latency sentinels')
+        t.true(fs.existsSync(expectedTargetDir), 'Target unit must exist inside designated package workspace')
+        t.true(fs.existsSync(path.join(expectedTargetDir, 'radar.unit.ts')))
     },
 )
 
