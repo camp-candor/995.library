@@ -1,7 +1,7 @@
 import test from 'ava'
 import sinon from 'sinon'
 import { ChoiceModel } from '../995.library/85.choice.unit/choice.model'
-import { openChoice } from '../995.library/85.choice.unit/buz/choice.buzz'
+import { openChoice, initChoice, updateChoice } from '../995.library/85.choice.unit/buz/choice.buzz'
 
 test('openChoice -- handles headless environment cleanly without throwing', (t) => {
     const model = new ChoiceModel()
@@ -97,6 +97,201 @@ test('openChoice -- binds vertical navigation keys and unbinds on submit', (t) =
     t.is(slv.firstCall.args[0].chcBit.src, 'OPTION A')
 })
 
+test('openChoice -- executes focus callback (dat.cb) when option receives focus', (t) => {
+    const model = new ChoiceModel()
+    const cbSpy = sinon.fake()
+    let focusHandler: Function = () => {}
+
+    const mockButton = {
+        on: (event: string, handler: Function) => {
+            if (event === 'focus') focusHandler = handler
+        },
+        focus: sinon.fake(),
+        content: 'ITEM ALPHA',
+        index: 1,
+    }
+
+    const mockForm = {
+        _selected: mockButton,
+        focusPrevious: sinon.fake(),
+        focusNext: sinon.fake(),
+        destroy: sinon.fake(),
+        on: sinon.fake(),
+    }
+
+    const ste = {
+        value: {
+            terminal: {
+                blessed: {
+                    form: () => mockForm,
+                    button: () => mockButton,
+                },
+                screen: {
+                    key: sinon.fake(),
+                    unkey: sinon.fake(),
+                    render: sinon.fake(),
+                },
+            },
+        },
+    } as any
+
+    const bal = {
+        idx: 'test-cb',
+        lst: ['ITEM ALPHA'],
+        dat: { cb: cbSpy },
+    } as any
+
+    openChoice(model, bal, ste)
+
+    focusHandler()
+
+    t.true(cbSpy.calledOnce, 'dat.cb must be called when button focus fires')
+    t.is(cbSpy.firstCall.args[0], 'ITEM ALPHA')
+})
+
+test('openChoice -- handles empty item lists cleanly without throws', (t) => {
+    const model = new ChoiceModel()
+    const slv = sinon.fake()
+    let submitHandler: Function = () => {}
+
+    const mockForm = {
+        _selected: null,
+        focusPrevious: sinon.fake(),
+        focusNext: sinon.fake(),
+        destroy: sinon.fake(),
+        on: (event: string, handler: Function) => {
+            if (event === 'submit') submitHandler = handler
+        },
+    }
+
+    const ste = {
+        value: {
+            terminal: {
+                blessed: {
+                    form: () => mockForm,
+                    button: () => ({ on: sinon.fake(), focus: sinon.fake() }),
+                },
+                screen: {
+                    key: sinon.fake(),
+                    unkey: sinon.fake(),
+                    render: sinon.fake(),
+                },
+            },
+        },
+    } as any
+
+    const bal = {
+        idx: 'empty-test',
+        lst: [],
+        slv,
+    } as any
+
+    openChoice(model, bal, ste)
+    submitHandler()
+
+    t.true(slv.calledOnce)
+    t.is(slv.firstCall.args[0].chcBit.src, '')
+})
+
+test('openChoice -- dynamic leak test: verifies 0 listener accumulation across 100 cycles', (t) => {
+    const listeners: Record<string, Function[]> = {}
+
+    const keyFake = (keys: string[], fn: Function) => {
+        keys.forEach((k) => {
+            listeners[k] = listeners[k] || []
+            listeners[k].push(fn)
+        })
+    }
+
+    const unkeyFake = (keys: string[], fn: Function) => {
+        keys.forEach((k) => {
+            if (listeners[k]) {
+                listeners[k] = listeners[k].filter((h) => h !== fn)
+            }
+        })
+    }
+
+    let destroyedCount = 0
+
+    const mockScreen = {
+        key: keyFake,
+        unkey: unkeyFake,
+        render: sinon.fake(),
+    }
+
+    const makeSte = (onSubmitTrigger: { current: Function | null }) =>
+        ({
+            value: {
+                terminal: {
+                    blessed: {
+                        form: () => ({
+                            _selected: { content: 'TEST', index: 1 },
+                            destroy: () => {
+                                destroyedCount++
+                            },
+                            on: (event: string, cb: Function) => {
+                                if (event === 'submit') onSubmitTrigger.current = cb
+                            },
+                        }),
+                        button: () => ({
+                            on: sinon.fake(),
+                            focus: sinon.fake(),
+                        }),
+                    },
+                    screen: mockScreen,
+                },
+            },
+        }) as any
+
+    const totalCycles = 100
+
+    for (let i = 0; i < totalCycles; i++) {
+        const onSubmitTrigger = { current: null as Function | null }
+        const ste = makeSte(onSubmitTrigger)
+
+        openChoice(
+            new ChoiceModel(),
+            {
+                idx: `cycle-${i}`,
+                lst: ['CHOICE 1', 'CHOICE 2'],
+                slv: sinon.fake(),
+            } as any,
+            ste,
+        )
+
+        // Trigger form submit to engage atomic cleanup
+        if (onSubmitTrigger.current) {
+            onSubmitTrigger.current()
+        }
+    }
+
+    const upListeners = listeners['up']?.length || 0
+    const downListeners = listeners['down']?.length || 0
+    const kListeners = listeners['k']?.length || 0
+    const jListeners = listeners['j']?.length || 0
+
+    t.is(upListeners, 0, 'No lingering "up" listeners permitted after 100 iterations')
+    t.is(downListeners, 0, 'No lingering "down" listeners permitted after 100 iterations')
+    t.is(kListeners, 0, 'No lingering "k" listeners permitted after 100 iterations')
+    t.is(jListeners, 0, 'No lingering "j" listeners permitted after 100 iterations')
+    t.is(destroyedCount, totalCycles, 'Every allocated form widget must be destroyed')
+})
+
+test('initChoice and updateChoice -- resolve immediately with no blocking debugger halts', (t) => {
+    const model = new ChoiceModel()
+    const slvInit = sinon.fake()
+    const slvUpdate = sinon.fake()
+
+    initChoice(model, { idx: 'init', slv: slvInit } as any, null as any)
+    updateChoice(model, { idx: 'update', slv: slvUpdate } as any, null as any)
+
+    t.true(slvInit.calledOnce)
+    t.is(slvInit.firstCall.args[0].chcBit.idx, 'init-choice')
+
+    t.true(slvUpdate.calledOnce)
+    t.is(slvUpdate.firstCall.args[0].chcBit.idx, 'update-choice')
+})
+
 test('openChoice -- single-step navigation invariant (keys: false on form avoids duplicate key routing)', (t) => {
     const model = new ChoiceModel()
     const slv = sinon.fake()
@@ -179,6 +374,7 @@ test('openChoice -- single-step navigation invariant (keys: false on form avoids
     handleUp()
     t.is(mockForm.focusPrevious.callCount, 1, 'Up stroke must move focus backward by exactly 1 item')
 })
+
 
 test('openChoice -- synchronizes form._selected on button focus event', (t) => {
     const model = new ChoiceModel()
