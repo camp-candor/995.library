@@ -566,10 +566,30 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             break
         }
 
-        case ActLib.PROGRESS_LIBRARY.split(']')[1]: {
+                case ActLib.PROGRESS_LIBRARY.split(']')[1]: {
             await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
             bit = await ste.hunt(ActLib.SCAN_LIBRARY, {})
-            lst = bit.libBit.lst
+            const targets: string[] = bit?.libBit?.lst || []
+
+            if (targets.length === 0) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> [FLEET NOTICE] No sibling repositories discovered.',
+                })
+                bit = await ste.hunt(ActMnu.PRINT_MENU, bit)
+                break
+            }
+
+            const allSiblingsLabel = `[ALL SIBLINGS (${targets.length})]`
+            lst = [allSiblingsLabel, ...targets]
+
+            const descriptions: Record<string, string> = {
+                [allSiblingsLabel]: `-Atomically broadcast 995.library\nacross all ${targets.length} sibling repositories.`,
+            }
+
+            for (const t of targets) {
+                descriptions[t] = `-Synchronize 995.library into\n${t}`
+            }
 
             bit = await ste.hunt(ActGrd.UPDATE_GRID, {
                 x: 0,
@@ -578,28 +598,99 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 ySpan: 12,
             })
             bit = await ste.hunt(ActChc.OPEN_CHOICE, {
-                dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+                dat: {
+                    clr0: Color.BLACK,
+                    clr1: Color.YELLOW,
+                    cb: (choice: string) => {
+                        const text = descriptions[choice] || 'No description available.'
+                        text.split('\n').forEach((s: string) =>
+                            ste.hunt(ActCns.UPDATE_CONSOLE, {
+                                idx: 'cns00',
+                                src: s,
+                            }),
+                        )
+                    },
+                },
                 src: Align.VERTICAL,
                 lst,
                 net: bit.grdBit.dat,
             })
-            src = bit.chcBit.src
+            src = bit?.chcBit?.src
 
-            if (src) {
-                await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: 'Progressing library... Please wait.',
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+
+            if (src === allSiblingsLabel || src === '[ALL SIBLINGS]') {
+                // Two-phase safety confirmation modal
+                const confirmGrid = await ste.hunt(ActGrd.UPDATE_GRID, {
+                    x: 0,
+                    y: 4,
+                    xSpan: 4,
+                    ySpan: 4,
                 })
-                bit = await ste.hunt(ActLib.PROGRESS_LIBRARY, { src })
+                const confirmChoice = await ste.hunt(ActChc.OPEN_CHOICE, {
+                    dat: { clr0: Color.BLACK, clr1: Color.RED },
+                    src: Align.VERTICAL,
+                    lst: [
+                        '[NO]  CANCEL BATCH SYNC',
+                        `[YES] BROADCAST TO ${targets.length} SIBLINGS`,
+                    ],
+                    net: confirmGrid.grdBit.dat,
+                })
+
+                await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+
+                if (confirmChoice?.chcBit?.src?.startsWith('[YES]')) {
+                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [SAGA] Initiating batch broadcast to ${targets.length} sibling repos...`,
+                    })
+
+                    const sagaRes: any = await ste.hunt(ActLib.PROGRESS_LIBRARY_SAGA, {
+                        lst: targets,
+                    })
+
+                    if (sagaRes?.libBit?.idx === 'progress-library-saga-error') {
+                        await ste.hunt(ActMnu.SAGA_TORN_STATE_MENU, {
+                            dat: sagaRes?.libBit?.dat,
+                        })
+                        return cpy
+                    }
+
+                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: `>> [OK] Fleet propagation completed for ${targets.length} repositories.`,
+                    })
+                } else {
+                    await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                        idx: 'cns00',
+                        src: '>> [ABORT] Batch broadcast cancelled by operator.',
+                    })
+                }
+            } else if (src) {
                 await ste.hunt(ActCns.UPDATE_CONSOLE, {
                     idx: 'cns00',
-                    src: 'Library progression completed.',
+                    src: `>> [SAGA] Progressing library to target: ${src}`,
+                })
+
+                const sagaRes: any = await ste.hunt(ActLib.PROGRESS_LIBRARY_SAGA, {
+                    lst: [src],
+                })
+
+                if (sagaRes?.libBit?.idx === 'progress-library-saga-error') {
+                    await ste.hunt(ActMnu.SAGA_TORN_STATE_MENU, {
+                        dat: sagaRes?.libBit?.dat,
+                    })
+                    return cpy
+                }
+
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [OK] Target synchronization complete: ${src}`,
                 })
             } else {
-                ste.hunt(ActCns.UPDATE_CONSOLE, {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
                     idx: 'cns00',
-                    src: 'No directory selected',
+                    src: '>> [NOTICE] No directory selected.',
                 })
             }
 
