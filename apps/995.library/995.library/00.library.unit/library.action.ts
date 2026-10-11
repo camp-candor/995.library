@@ -20,33 +20,33 @@ export class ListLibrary implements Action<LibraryBit> {
 }
 
 export const PROGRESS_LIBRARY = '[Progress action] Progress Library'
-export class ProgressLibrary implements Action<LibraryBit | undefined> {
+export class ProgressLibrary implements Action<LibraryBit> {
     readonly type = PROGRESS_LIBRARY
-    constructor(public bale?: LibraryBit) {}
+    constructor(public bale: LibraryBit) {}
 }
 
 export const SCAN_LIBRARY = '[Scan action] Scan Library'
-export class ScanLibrary implements Action<LibraryBit | undefined> {
+export class ScanLibrary implements Action<LibraryBit> {
     readonly type = SCAN_LIBRARY
-    constructor(public bale?: LibraryBit) {}
+    constructor(public bale: LibraryBit) {}
 }
 
 export const SCAN_FLEET = '[Scan action] Scan Fleet'
-export class ScanFleet implements Action<LibraryBit | undefined> {
+export class ScanFleet implements Action<LibraryBit> {
     readonly type = SCAN_FLEET
-    constructor(public bale?: LibraryBit) {}
+    constructor(public bale: LibraryBit) {}
 }
 
 export const LAUNCH_LIBRARY = '[Launch action] Launch Library'
-export class LaunchLibrary implements Action<LibraryBit | undefined> {
+export class LaunchLibrary implements Action<LibraryBit> {
     readonly type = LAUNCH_LIBRARY
-    constructor(public bale?: LibraryBit) {}
+    constructor(public bale: LibraryBit) {}
 }
 
 export const FLAT_LIBRARY = '[Flat action] Flat Library'
-export class FlatLibrary implements Action<LibraryBit | undefined> {
+export class FlatLibrary implements Action<LibraryBit> {
     readonly type = FLAT_LIBRARY
-    constructor(public bale?: LibraryBit) {}
+    constructor(public bale: LibraryBit) {}
 }
 
 export const CHECK_GIT_WORKING_TREE = '[Git action] Check Git Working Tree'
@@ -62,9 +62,9 @@ export class ProgressLibrarySaga implements Action<LibraryBit> {
 }
 
 export const AUDIT_LIBRARY = '[Audit action] Audit Library'
-export class AuditLibrary implements Action<LibraryBit | undefined> {
+export class AuditLibrary implements Action<LibraryBit> {
     readonly type = AUDIT_LIBRARY
-    constructor(public bale?: LibraryBit) {}
+    constructor(public bale: LibraryBit) {}
 }
 
 export type Actions =
