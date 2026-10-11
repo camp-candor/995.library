@@ -4,7 +4,8 @@
     "private": true,
     "scripts": {
         "dev": "npx tsx run.ts -t pivot",
-        "test": "ava"
+        "test": "ava",
+        "check:gauntlet": "ava test/gauntlet.verification.test.ts"
     },
     "ava": {
         "files": [
