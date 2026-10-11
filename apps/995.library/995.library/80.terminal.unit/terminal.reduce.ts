@@ -1,4 +1,4 @@
-import clone from 'clone-deep'
+import { cloneDeep as clone } from 'lodash'
 import * as Act from './terminal.action'
 import { TerminalModel } from './terminal.model'
 import * as Buzz from './terminal.buzzer'

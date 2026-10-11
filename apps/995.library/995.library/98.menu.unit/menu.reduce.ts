@@ -1,4 +1,4 @@
-import clone from 'clone-deep'
+import { cloneDeep as clone } from 'lodash'
 import * as Act from './menu.action'
 import { MenuModel } from './menu.model'
 import * as Buzz from './menu.buzzer'
@@ -30,7 +30,6 @@ export function reducer(
 
         case Act.ROUTE_MENU:
             return Buzz.routeMenu(clone(model), act.bale, state)
-
 
         case Act.FLEET_MENU:
             return Buzz.fleetMenu(clone(model), act.bale, state)

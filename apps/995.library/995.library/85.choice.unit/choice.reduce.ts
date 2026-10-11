@@ -1,4 +1,4 @@
-import clone from 'clone-deep'
+import { cloneDeep as clone } from 'lodash'
 import * as Act from './choice.action'
 import { ChoiceModel } from './choice.model'
 import * as Buzz from './choice.buzzer'

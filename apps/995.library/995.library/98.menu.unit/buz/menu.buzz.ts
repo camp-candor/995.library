@@ -206,7 +206,7 @@ export const testMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 }
 
 export const closeMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
-    await ste.hunt(ActTrm.CLOSE_TERMINAL, {})
+    if (ste?.hunt) await ste.hunt(ActTrm.CLOSE_TERMINAL, {})
 
     return cpy
 }
