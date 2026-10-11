@@ -101,6 +101,7 @@ test('Phase 4 Negative Control: sagaTornStateMenu handles missing or malformed j
 });
 
 
+import test from 'ava'
 import sinon from 'sinon'
 import * as ActLib from '../995.library/00.library.unit/library.action'
 import * as ActTrm from '../995.library/80.terminal.unit/terminal.action'
@@ -220,6 +221,7 @@ test.serial(
         )
     },
 )
+
 test.serial(
     'libraryMenu -- static deduplication invariant: ensures zero duplicate switch branches',
     (t) => {
@@ -230,7 +232,7 @@ test.serial(
             path.resolve(process.cwd(), 'apps/995.library/995.library/98.menu.unit/buz/menu.library.ts'),
             path.resolve(__dirname, '../995.library/98.menu.unit/buz/menu.library.ts'),
         ]
-        const filePath = candidatePaths.find((p) => fs.existsSync(p))
+        const filePath = candidatePaths.find((p: string) => fs.existsSync(p))
         t.truthy(filePath, 'menu.library.ts must exist on disk')
 
         const content = fs.readFileSync(filePath, 'utf8')
@@ -247,5 +249,96 @@ test.serial(
             [],
             `Found duplicate case branch(es) in menu.library.ts: ${JSON.stringify(duplicates)}`,
         )
+    },
+)
+
+test.serial(
+    'defensive teardown -- updateMenu clears terminal before routing to LIBRARY MENU',
+    async (t) => {
+        const { updateMenu } = require('../995.library/98.menu.unit/buz/menu.buzz.ts')
+        const model = new MenuModel()
+        const clearedSteps: string[] = []
+
+        const mockState: any = {
+            hunt: sinon.spy(async (actionType: string, payload: any) => {
+                clearedSteps.push(actionType)
+                if (actionType === ActGrd.UPDATE_GRID) {
+                    return { grdBit: { dat: {} } }
+                }
+                if (actionType === ActChc.OPEN_CHOICE) {
+                    return { chcBit: { src: 'LIBRARY MENU' } }
+                }
+                if (actionType === ActTrm.CLEAR_TERMINAL) {
+                    return {}
+                }
+                if (actionType === ActMnu.LIBRARY_MENU) {
+                    return { mnuBit: { idx: 'lib' } }
+                }
+                if (actionType === ActMnu.PRINT_MENU) {
+                    return {}
+                }
+                if (actionType === ActMnu.UPDATE_MENU) {
+                    return {}
+                }
+                return {}
+            }),
+        }
+
+        // Execute single updateMenu turn (mock timer to not recurse)
+        const clock = sinon.useFakeTimers()
+        try {
+            await updateMenu(model, { idx: 'test-turn' } as any, mockState)
+
+            const clearIndex = clearedSteps.indexOf(ActTrm.CLEAR_TERMINAL)
+            const libraryMenuIndex = clearedSteps.indexOf(ActMnu.LIBRARY_MENU)
+
+            t.true(clearIndex !== -1, 'CLEAR_TERMINAL must be dispatched')
+            t.true(
+                clearIndex < libraryMenuIndex,
+                'CLEAR_TERMINAL must be dispatched BEFORE LIBRARY_MENU',
+            )
+        } finally {
+            clock.restore()
+        }
+    },
+)
+
+test.serial(
+    'defensive teardown -- libraryMenu clears terminal before returning to ROOT MENU',
+    async (t) => {
+        const model = new MenuModel()
+        const clearedSteps: string[] = []
+
+        const mockState: any = {
+            hunt: sinon.spy(async (actionType: string, payload: any) => {
+                clearedSteps.push(actionType)
+                if (actionType === ActTrm.CLEAR_TERMINAL) {
+                    return {}
+                }
+                if (actionType === ActCns.UPDATE_CONSOLE) {
+                    return {}
+                }
+                if (actionType === ActGrd.UPDATE_GRID) {
+                    return { grdBit: { dat: {} } }
+                }
+                if (actionType === ActChc.OPEN_CHOICE) {
+                    return { chcBit: { src: 'ROOT MENU' } }
+                }
+                if (actionType === ActMnu.UPDATE_MENU) {
+                    return {}
+                }
+                return {}
+            }),
+        }
+
+        await libraryMenu(model, { idx: 'test-lib' } as any, mockState)
+
+        // Verify CLEAR_TERMINAL occurs before ROOT MENU executes ActMnu.UPDATE_MENU
+        const clearCount = clearedSteps.filter((s) => s === ActTrm.CLEAR_TERMINAL).length
+        t.true(clearCount >= 2, 'CLEAR_TERMINAL must be called on entry and before ROOT MENU exit')
+
+        const lastClear = clearedSteps.lastIndexOf(ActTrm.CLEAR_TERMINAL)
+        const updateMenuIdx = clearedSteps.lastIndexOf(ActMnu.UPDATE_MENU)
+        t.true(lastClear < updateMenuIdx, 'Final CLEAR_TERMINAL must precede UPDATE_MENU return')
     },
 )
