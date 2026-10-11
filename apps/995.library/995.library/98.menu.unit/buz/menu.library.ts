@@ -82,6 +82,8 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             '-List all the units\ncurrently in the library.',
         [ActLib.AUDIT_LIBRARY.split(']')[1]]:
             '-Compare fleet repositories against\nthe Central Coordination Manifest.',
+        [ActLib.PROGRESS_LIBRARY.split(']')[1]]:
+            '-Synchronize 995.library across\nsibling repositories.',
         [ActLib.LAUNCH_LIBRARY.split(']')[1]]: '-Launch library urls.',
         'ROOT MENU': '-Return to the root menu.',
     }
@@ -628,7 +630,18 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                     ySpan: 4,
                 })
                 const confirmChoice = await ste.hunt(ActChc.OPEN_CHOICE, {
-                    dat: { clr0: Color.BLACK, clr1: Color.RED },
+                    dat: {
+                        clr0: Color.BLACK,
+                        clr1: Color.YELLOW,
+                        cb: (choice: string) => {
+                            ste.hunt(ActCns.UPDATE_CONSOLE, {
+                                idx: 'cns00',
+                                src: choice.startsWith('[YES]')
+                                    ? `>> [CONFIRM] Broadcast to ${targets.length} sibling repositories.`
+                                    : '>> [ABORT] Cancel batch synchronization.',
+                            })
+                        },
+                    },
                     src: Align.VERTICAL,
                     lst: [
                         '[NO]  CANCEL BATCH SYNC',

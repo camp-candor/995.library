@@ -545,43 +545,79 @@ export const progressLibrary = async (
     return cpy
 }
 
+export const resolveRepoRoot = (startDir: string = process.cwd()): string => {
+    const fs = require('fs-extra')
+    const path = require('path')
+    let curr = path.resolve(startDir)
+    while (
+        curr &&
+        curr !== path.dirname(curr) &&
+        !(
+            fs.existsSync(path.join(curr, 'apps')) &&
+            fs.existsSync(path.join(curr, 'packages'))
+        )
+    ) {
+        const parent = path.dirname(curr)
+        if (parent === curr) break
+        curr = parent
+    }
+    if (
+        fs.existsSync(path.join(curr, 'apps')) &&
+        fs.existsSync(path.join(curr, 'packages'))
+    ) {
+        return curr
+    }
+    return path.resolve(startDir)
+}
+
 export const scanLibrary = (cpy: LibraryModel, bal: LibraryBit, ste: State) => {
     /**
      * Scans sibling directories to find other workspaces containing an `apps/995.library` folder.
      *
-     * It moves up one level from the current repository root and inspects all adjacent directories.
-     * If a sibling repository contains an `apps/995.library` path, its relative path (from the current
-     * process root) is added to the results list. This list can then be used to synchronize or
+     * It resolves the monorepo root dynamically, moves up one level, and inspects all adjacent directories.
+     * If a sibling repository contains an `apps/995.library` path, its relative path (from the repository root)
+     * is added to the results list. This list can then be used to synchronize or
      * "progress" the library across different projects.
      */
-    const fs = require('fs')
+    const fs = require('fs-extra')
     const path = require('path')
 
     const resultList: string[] = []
-    const parentDir = path.resolve(process.cwd(), '..')
+    const repoRoot = resolveRepoRoot(process.cwd())
+    const parentDir = path.resolve(repoRoot, '..')
 
     try {
-        const entries = fs.readdirSync(parentDir, { withFileTypes: true })
+        if (fs.existsSync(parentDir)) {
+            const entries = fs.readdirSync(parentDir, { withFileTypes: true })
 
-        for (const entry of entries) {
-            if (!entry.isDirectory()) continue
+            for (const entry of entries) {
+                if (!entry.isDirectory()) continue
 
-            const itemPath = path.join(parentDir, entry.name)
+                const itemPath = path.join(parentDir, entry.name)
 
-            // Skip the current repo
-            if (itemPath === process.cwd()) continue
+                // Skip the current repo
+                if (path.resolve(itemPath) === path.resolve(repoRoot)) continue
 
-            const libraryDir = path.join(itemPath, 'apps', '995.library')
-            if (fs.existsSync(libraryDir)) {
-                const relativePath = path.relative(process.cwd(), libraryDir)
-                resultList.push(`[${relativePath.replace(/\\/g, '/')}]`)
+                const libraryDir = path.join(itemPath, 'apps', '995.library')
+                if (fs.existsSync(libraryDir)) {
+                    const relativePath = path.relative(repoRoot, libraryDir)
+                    resultList.push(`[${relativePath.replace(/\\/g, '/')}]`)
+                }
             }
         }
     } catch (err: any) {
-        console.error(`Error in scanLibrary: ${err.message}`)
+        if (ste && typeof ste.hunt === 'function') {
+            const ActCns = require('../../83.console.unit/console.action')
+            ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [SCAN_LIBRARY_ERR] ${err.message}`,
+            })
+        }
     }
 
-    if (bal.slv) bal.slv({ libBit: { idx: 'scan-library', lst: resultList } })
+    resultList.sort((a, b) => a.localeCompare(b))
+
+    if (bal && bal.slv) bal.slv({ libBit: { idx: 'scan-library', lst: resultList } })
 
     return cpy
 }
@@ -1527,12 +1563,14 @@ export const progressLibrarySaga = async (
         return cpy
     }
 
+    const repoRoot = resolveRepoRoot(process.cwd())
+
     let sourceDir = (bal.dat as any)?.sourceDir
     if (!sourceDir) {
-        sourceDir = path.resolve(process.cwd(), 'apps', '995.library')
+        sourceDir = path.resolve(repoRoot, 'apps', '995.library')
         if (!fs.existsSync(sourceDir)) {
-            if (fs.existsSync(path.resolve(process.cwd(), '995.library'))) {
-                sourceDir = process.cwd()
+            if (fs.existsSync(path.resolve(repoRoot, '995.library'))) {
+                sourceDir = repoRoot
             }
         }
     }
@@ -1551,7 +1589,7 @@ export const progressLibrarySaga = async (
     };
 
     for (const rawTarget of targets) {
-        const resolved = path.isAbsolute(rawTarget) ? rawTarget : path.resolve(process.cwd(), rawTarget);
+        const resolved = path.isAbsolute(rawTarget) ? rawTarget : path.resolve(repoRoot, rawTarget);
         sagaJournal.records[resolved] = { targetDir: resolved, state: 'PENDING' };
     }
 
@@ -1560,7 +1598,7 @@ export const progressLibrarySaga = async (
     let abortSaga = false;
 
     for (const rawTarget of targets) {
-        const resolvedTarget = path.isAbsolute(rawTarget) ? rawTarget : path.resolve(process.cwd(), rawTarget);
+        const resolvedTarget = path.isAbsolute(rawTarget) ? rawTarget : path.resolve(repoRoot, rawTarget);
         const record = sagaJournal.records[resolvedTarget];
 
         // PHASE 0: PRE-FLIGHT WORKING TREE GUARD
