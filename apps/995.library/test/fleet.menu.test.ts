@@ -101,7 +101,6 @@ test('Phase 4 Negative Control: sagaTornStateMenu handles missing or malformed j
 });
 
 
-import test from 'ava'
 import sinon from 'sinon'
 import * as ActLib from '../995.library/00.library.unit/library.action'
 import * as ActTrm from '../995.library/80.terminal.unit/terminal.action'
@@ -340,5 +339,107 @@ test.serial(
         const lastClear = clearedSteps.lastIndexOf(ActTrm.CLEAR_TERMINAL)
         const updateMenuIdx = clearedSteps.lastIndexOf(ActMnu.UPDATE_MENU)
         t.true(lastClear < updateMenuIdx, 'Final CLEAR_TERMINAL must precede UPDATE_MENU return')
+    },
+)
+
+test.serial(
+    'libraryMenu -- Progress Library prepends [ALL SIBLINGS] and dispatches PROGRESS_LIBRARY_SAGA on confirmation',
+    async (t) => {
+        const model = new MenuModel()
+        const mockTargets = [
+            '[../000.series-dashboard/apps/995.library]',
+            '[../000.series-sower-engine/apps/995.library]',
+        ]
+
+        let displayedChoices: string[] = []
+        let sagaDispatched = false
+        let sagaPayload: any = null
+
+        const mockState: any = {
+            hunt: sinon.spy(async (actionType: string, payload: any) => {
+                if (actionType === ActTrm.CLEAR_TERMINAL) return {}
+                if (actionType === ActCns.UPDATE_CONSOLE) return {}
+                if (actionType === ActGrd.UPDATE_GRID) {
+                    return { grdBit: { dat: {} } }
+                }
+                if (actionType === ActChc.OPEN_CHOICE) {
+                    // First choice modal: select [ALL SIBLINGS (2)]
+                    if (payload.lst.some((s: string) => s.startsWith('[ALL SIBLINGS'))) {
+                        displayedChoices = payload.lst
+                        return { chcBit: { src: payload.lst[0] } }
+                    }
+                    // Second choice modal (Confirmation): select [YES]
+                    if (payload.lst.some((s: string) => s.startsWith('[YES]'))) {
+                        return { chcBit: { src: payload.lst[1] } }
+                    }
+                    // Initial library menu choice: select Progress Library
+                    return { chcBit: { src: ActLib.PROGRESS_LIBRARY.split(']')[1] } }
+                }
+                if (actionType === ActLib.SCAN_LIBRARY) {
+                    return { libBit: { lst: mockTargets } }
+                }
+                if (actionType === ActLib.PROGRESS_LIBRARY_SAGA) {
+                    sagaDispatched = true
+                    sagaPayload = payload
+                    return { libBit: { idx: 'progress-library-saga', val: mockTargets.length } }
+                }
+                if (actionType === ActMnu.PRINT_MENU) return {}
+                return {}
+            }),
+        }
+
+        await libraryMenu(model, { idx: 'test-progress-batch' } as any, mockState)
+
+        t.true(
+            displayedChoices.some((c) => c.startsWith('[ALL SIBLINGS')),
+            'Must prepend [ALL SIBLINGS] option to choice list',
+        )
+        t.true(sagaDispatched, 'Must dispatch PROGRESS_LIBRARY_SAGA when confirmed')
+        t.deepEqual(
+            sagaPayload?.lst,
+            mockTargets,
+            'Must pass all discovered targets to PROGRESS_LIBRARY_SAGA',
+        )
+    },
+)
+
+test.serial(
+    'libraryMenu -- Progress Library aborts without dispatching saga when operator selects [NO]',
+    async (t) => {
+        const model = new MenuModel()
+        const mockTargets = ['[../000.series-dashboard/apps/995.library]']
+
+        let sagaDispatched = false
+
+        const mockState: any = {
+            hunt: sinon.spy(async (actionType: string, payload: any) => {
+                if (actionType === ActTrm.CLEAR_TERMINAL) return {}
+                if (actionType === ActCns.UPDATE_CONSOLE) return {}
+                if (actionType === ActGrd.UPDATE_GRID) return { grdBit: { dat: {} } }
+                if (actionType === ActChc.OPEN_CHOICE) {
+                    if (payload.lst.some((s: string) => s.startsWith('[ALL SIBLINGS'))) {
+                        return { chcBit: { src: payload.lst[0] } }
+                    }
+                    // Confirm selection: select [NO] CANCEL BATCH SYNC
+                    if (payload.lst.some((s: string) => s.startsWith('[NO]'))) {
+                        return { chcBit: { src: payload.lst[0] } }
+                    }
+                    return { chcBit: { src: ActLib.PROGRESS_LIBRARY.split(']')[1] } }
+                }
+                if (actionType === ActLib.SCAN_LIBRARY) {
+                    return { libBit: { lst: mockTargets } }
+                }
+                if (actionType === ActLib.PROGRESS_LIBRARY_SAGA) {
+                    sagaDispatched = true
+                    return {}
+                }
+                if (actionType === ActMnu.PRINT_MENU) return {}
+                return {}
+            }),
+        }
+
+        await libraryMenu(model, { idx: 'test-progress-cancel' } as any, mockState)
+
+        t.false(sagaDispatched, 'Saga must NOT dispatch when operator selects [NO]')
     },
 )
