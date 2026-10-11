@@ -175,6 +175,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 
     switch (src) {
         case 'LIBRARY MENU':
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
             bit = await ste.hunt(ActMnu.LIBRARY_MENU, {})
             bit = await ste.hunt(ActMnu.PRINT_MENU, bit)
             bit = await ste.hunt(ActMnu.UPDATE_MENU)
@@ -187,6 +188,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 await handler(cpy, bal, ste)
             } else {
                 // Default fallback
+                await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
                 bit = await ste.hunt(ActTrm.CLOSE_TERMINAL, {})
             }
 

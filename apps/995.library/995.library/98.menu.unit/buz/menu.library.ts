@@ -37,6 +37,7 @@ let bit: any, lst: any, dex: any, idx: any, dat: any, src: any
 let opened = false
 
 export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
+    if (ste?.hunt) await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
     if (!ste) {
         if (bal?.slv) bal.slv({ mnuBit: { idx: 'library-menu-headless' } })
         return cpy
@@ -663,6 +664,8 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         }
 
         case 'ROOT MENU': {
+            // Defensive teardown prior to returning to master navigation switchboard
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
             bit = await ste.hunt(ActMnu.UPDATE_MENU, {})
             return cpy
         }
