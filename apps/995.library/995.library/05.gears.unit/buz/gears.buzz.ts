@@ -7,7 +7,7 @@ import type State from '../../99.core/state'
 import * as ActGer from '../gears.action'
 
 export const initGears = async (cpy: GearsModel, bal: GearsBit, ste: State) => {
-    debugger
+
     return cpy
 }
 
@@ -130,7 +130,7 @@ export const searchGears = async (
         })
     } else {
         if (bal.slv != null)
-            bal.slv({ srcBit: { idx: 'error-search', src: bal.src } })
+            bal.slv({ grsBit: { idx: 'error-search', src: bal.src } })
         return
     }
 
@@ -200,13 +200,13 @@ export const searchGears = async (
 
     nightTrap
 
-    bal.slv({ grsBit: { idx: 'search-gears', lst: nightTrap } })
+    bal.slv({ grsBit: { idx: 'search-gears', dat: nightTrap } })
 
     return cpy
 }
 
 export const testGears = async (cpy: GearsModel, bal: GearsBit, ste: State) => {
-    debugger
+
     return cpy
 }
 
@@ -358,7 +358,7 @@ export const createGears = async (
 
     nightTrap
 
-    bal.slv({ grsBit: { idx: 'create-gears', lst: nightTrap } })
+    bal.slv({ grsBit: { idx: 'create-gears', dat: nightTrap } })
 
     return cpy
 }

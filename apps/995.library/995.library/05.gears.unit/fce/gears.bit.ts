@@ -3,5 +3,5 @@ export default interface GearsBit {
     src?: string
     val?: number
     dat?: any
-    slv?: Function
+    slv?: (result: { grsBit: Partial<GearsBit> }) => void
 }
