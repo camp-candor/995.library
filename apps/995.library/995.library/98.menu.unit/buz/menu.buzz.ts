@@ -184,6 +184,7 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                 // Clean teardown on unknown exit or terminal termination
                 await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
                 bit = await ste.hunt(ActTrm.CLOSE_TERMINAL, {})
+                await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
             }
             break
         }
