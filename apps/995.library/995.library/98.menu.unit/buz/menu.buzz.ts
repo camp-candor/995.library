@@ -211,8 +211,8 @@ export const closeMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     return cpy
 }
 
-export const createMenu = (cpy: MenuModel, bal: MenuBit, ste: State) => {
-    debugger
+export const createMenu = (cpy: MenuModel, bal: MenuBit, _ste: State) => {
+    if (bal?.slv != null) bal.slv({ mnuBit: { idx: 'create-menu' } })
     return cpy
 }
 
