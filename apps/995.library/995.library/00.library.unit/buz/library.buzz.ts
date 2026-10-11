@@ -99,7 +99,7 @@ export const initLibrary = async (
 
     //if (bal.val == 1) patch(ste, ActMnu.INIT_MENU, bal);
     bit = await ste.hunt(ActMnu.INIT_MENU, bal)
-    if (bal.slv != null) bal.slv({ intBit: { idx: 'init-mythos' } })
+    if (bal.slv != null) bal.slv({ libBit: { idx: 'init-mythos' } })
 
     return cpy
 }
@@ -1527,7 +1527,7 @@ export const progressLibrarySaga = async (
         return cpy
     }
 
-    let sourceDir = bal.dat?.sourceDir
+    let sourceDir = (bal.dat as any)?.sourceDir
     if (!sourceDir) {
         sourceDir = path.resolve(process.cwd(), 'apps', '995.library')
         if (!fs.existsSync(sourceDir)) {
@@ -1694,7 +1694,7 @@ export const auditLibrary = async (
     await emit('>> [AUDIT] Initiating Fleet Version Drift Analysis...')
 
     // 1. Resolve Manifest Path
-    let manifestPath = bal?.src || (bal?.dat && bal.dat.manifestPath)
+    let manifestPath = bal?.src || (bal?.dat && (bal.dat as any).manifestPath)
     if (!manifestPath) {
         const candidates = [
             path.resolve(process.cwd(), 'apps/995.library/data/versions.json'),

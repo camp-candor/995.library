@@ -35,7 +35,7 @@ export const initTerminal = async (
     bit = await ste.hunt(ActTrm.OPEN_TERMINAL, {})
 
     if (bal?.val === 1) patch(ste, ActMnu.INIT_MENU, bal)
-    if (bal?.slv != null) bal.slv({ intBit: { idx: 'init-terminal' } })
+    if (bal?.slv != null) bal.slv({ trmBit: { idx: 'init-terminal' } })
 
     return cpy
 }

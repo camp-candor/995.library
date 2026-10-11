@@ -146,7 +146,7 @@ export const keyChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
     const screen = terminal?.screen
 
     if (!screen || !blessed) {
-        if (bal?.slv != null) bal.slv({ scnBit: { idx: 'key-choice-headless' } })
+        if (bal?.slv != null) bal.slv({ chcBit: { idx: 'key-choice-headless' } })
         return cpy
     }
 
@@ -169,7 +169,7 @@ export const keyChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
     })
 
     screen.render()
-    if (bal.slv != null) bal.slv({ scnBit: { idx: 'key-choice' } })
+    if (bal.slv != null) bal.slv({ chcBit: { idx: 'key-choice' } })
     return cpy
 }
 

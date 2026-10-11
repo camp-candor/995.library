@@ -352,7 +352,7 @@ export const createUnit = async (
         .replace(/\\/g, '/')
 
     // 7. Automated Manifest (BEE.ts) Re-Wiring Hook
-    if (ste && bal.dat?.autoWire !== false) {
+    if (ste && (bal.dat as any)?.autoWire !== false) {
         const parentPkgDir = path.dirname(targetUnitDir)
         const isDataUnit =
             path.resolve(parentPkgDir) === path.resolve(repoRoot, 'data', 'unit')
