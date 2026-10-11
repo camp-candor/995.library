@@ -673,9 +673,12 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         }
     }
 
-    setTimeout(async () => {
+    const timer = setTimeout(async () => {
         bit = await ste.hunt(ActMnu.LIBRARY_MENU, {})
     }, 333)
+    if (timer && typeof timer.unref === 'function') {
+        timer.unref()
+    }
 
     return cpy
 }
