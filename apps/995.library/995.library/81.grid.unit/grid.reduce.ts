@@ -1,4 +1,4 @@
-import clone from 'clone-deep'
+import { cloneDeep as clone } from 'lodash'
 import * as Act from './grid.action'
 import { GridModel } from './grid.model'
 import * as Buzz from './grid.buzzer'

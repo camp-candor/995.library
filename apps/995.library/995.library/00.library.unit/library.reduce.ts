@@ -1,4 +1,4 @@
-import clone from 'clone-deep'
+import { cloneDeep as clone } from 'lodash'
 import * as Act from './library.action'
 import { LibraryModel } from './library.model'
 import * as Buzz from './library.buzzer'
@@ -39,6 +39,9 @@ export function reducer(
 
         case Act.AUDIT_LIBRARY:
             return Buzz.auditLibrary(clone(model), act.bale, state)
+
+        case Act.CHECK_GIT_WORKING_TREE:
+            return Buzz.checkGitWorkingTree(act.bale.src || process.cwd()).then(() => clone(model))
 
         default:
             return model

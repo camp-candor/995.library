@@ -581,7 +581,7 @@ export const scanLibrary = (cpy: LibraryModel, bal: LibraryBit, ste: State) => {
         console.error(`Error in scanLibrary: ${err.message}`)
     }
 
-    if (bal.slv) bal.slv({ libBit: { idx: 'scan-library', lst: resultList } })
+    if (bal?.slv) bal.slv({ libBit: { idx: 'scan-library', lst: resultList } })
 
     return cpy
 }
