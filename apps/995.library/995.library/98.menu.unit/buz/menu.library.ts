@@ -510,30 +510,6 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             bit = await ste.hunt(ActMnu.PRINT_MENU, bit)
             break
 
-        case ActUnt.CREATE_UNIT.split(']')[1]:
-            bit = await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-
-            bit = await ste.hunt(ActGrd.UPDATE_GRID, {
-                x: 0,
-                y: 4,
-                xSpan: 4,
-                ySpan: 6,
-            })
-            bit = await ste.hunt(ActPut.OPEN_INPUT, {
-                dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
-                src: Align.VERTICAL,
-                lst,
-                txt: 'input verb',
-                net: bit.grdBit.dat,
-            })
-            idx = bit.putBit.src
-
-            var updateBit = await ste.hunt(ActUnt.CREATE_UNIT, { idx, src: 'data/unit' })
-
-            bit = await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-
-            bit = await ste.hunt(ActMnu.PRINT_MENU, updateBit)
-            break
 
         case ActLib.LIST_LIBRARY.split(']')[1]:
             var bit = await ste.hunt(ActLib.LIST_LIBRARY, {})
