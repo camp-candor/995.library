@@ -101,7 +101,6 @@ test('Phase 4 Negative Control: sagaTornStateMenu handles missing or malformed j
 });
 
 
-import test from 'ava'
 import sinon from 'sinon'
 import * as ActLib from '../995.library/00.library.unit/library.action'
 import * as ActTrm from '../995.library/80.terminal.unit/terminal.action'
@@ -218,6 +217,35 @@ test.serial(
                 line.includes('Central Coordination Manifest'),
             ),
             'Tooltip text for AUDIT_LIBRARY must stream to console',
+        )
+    },
+)
+test.serial(
+    'libraryMenu -- static deduplication invariant: ensures zero duplicate switch branches',
+    (t) => {
+        const fs = require('fs')
+        const path = require('path')
+
+        const candidatePaths = [
+            path.resolve(process.cwd(), 'apps/995.library/995.library/98.menu.unit/buz/menu.library.ts'),
+            path.resolve(__dirname, '../995.library/98.menu.unit/buz/menu.library.ts'),
+        ]
+        const filePath = candidatePaths.find((p) => fs.existsSync(p))
+        t.truthy(filePath, 'menu.library.ts must exist on disk')
+
+        const content = fs.readFileSync(filePath, 'utf8')
+        const caseMatches = [...content.matchAll(/case\s+([^:]+):/g)].map((m) => m[1].trim())
+
+        const caseCounts = new Map<string, number>()
+        for (const branch of caseMatches) {
+            caseCounts.set(branch, (caseCounts.get(branch) || 0) + 1)
+        }
+
+        const duplicates = [...caseCounts.entries()].filter(([_, count]) => count > 1)
+        t.deepEqual(
+            duplicates,
+            [],
+            `Found duplicate case branch(es) in menu.library.ts: ${JSON.stringify(duplicates)}`,
         )
     },
 )
