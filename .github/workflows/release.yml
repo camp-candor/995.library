@@ -34,6 +34,39 @@ jobs:
             - name: Install Monorepo Dependencies
               run: npm ci
 
+            - name: Assert Synchronized Workspace Versions
+              env:
+                  TAG_NAME: ${{ github.ref_name }}
+              run: |
+                  echo ">> Validating that root and apps/ package versions match release tag: ${TAG_NAME}..."
+                  node -e "
+                    const fs = require('fs');
+                    const path = require('path');
+                    const refTag = process.env.TAG_NAME || '';
+                    const expectedVer = refTag.replace(/^v/, '');
+                    const rootVer = require('./package.json').version;
+
+                    if (rootVer !== expectedVer) {
+                      console.error('::error::Root package.json (' + rootVer + ') does not match tag ' + refTag);
+                      process.exit(1);
+                    }
+
+                    const appsDir = path.resolve('apps');
+                    if (fs.existsSync(appsDir)) {
+                      for (const item of fs.readdirSync(appsDir)) {
+                        const pkgPath = path.join(appsDir, item, 'package.json');
+                        if (fs.existsSync(pkgPath)) {
+                          const childVer = JSON.parse(fs.readFileSync(pkgPath, 'utf8')).version;
+                          if (childVer !== expectedVer) {
+                            console.error('::error::Mismatch in ' + pkgPath + ' (' + childVer + ' != ' + expectedVer + ')');
+                            process.exit(1);
+                          }
+                        }
+                      }
+                    }
+                    console.log('>> [OK] Root and apps/ manifests are synchronized with tag: ' + refTag);
+                  "
+
             - name: Verify Static TypeScript Project References
               run: npm run check:types
 
@@ -50,7 +83,6 @@ jobs:
 
             - name: Mint and Publish GitHub Release
               env:
-                  # Evaluates custom repository secret GH_TOKEN first, falling back to built-in GITHUB_TOKEN
                   GH_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
                   GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
               run: |
