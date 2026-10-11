@@ -118,17 +118,17 @@ export const sagaTornStateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State
     await ste.hunt(ActTrm.CLEAR_TERMINAL, {});
     await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src: '==================================================' });
     await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src: 'FLEET SAGA CONTROLLER: PARTIALLY_MERGED TORN STATE' });
-    await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src: `SAGA ID: ${sagaJournal.sagaId}` });
+    await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src: `SAGA ID: ${(sagaJournal as any).sagaId}` });
     await ste.hunt(ActCns.UPDATE_CONSOLE, {
         idx: 'cns00',
-        src: `STATUS : [!] TORN (${sagaJournal.targetsCompleted.length} Completed / ${sagaJournal.targetsFailed.length} Failed)`,
+        src: `STATUS : [!] TORN (${(sagaJournal as any).targetsCompleted.length} Completed / ${(sagaJournal as any).targetsFailed.length} Failed)`,
     });
     await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src: '--------------------------------------------------' });
 
-    for (const completed of sagaJournal.targetsCompleted) {
+    for (const completed of (sagaJournal as any).targetsCompleted) {
         await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src: `  [OK]  ${completed}` });
     }
-    for (const failed of sagaJournal.targetsFailed) {
+    for (const failed of (sagaJournal as any).targetsFailed) {
         await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src: `  [ERR] ${failed}` });
     }
     await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src: '==================================================' });
@@ -173,7 +173,7 @@ export const sagaTornStateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State
     switch (src) {
         case '1. RETRY FAILED TARGET (After unlocking file/stopping dev)': {
             await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: 'cns00', src: '>> [RETRY] Re-dispatching saga on failed targets...' });
-            const retryTargets = sagaJournal.targetsFailed.map((t: string) => t.split(' ')[0]);
+            const retryTargets = (sagaJournal as any).targetsFailed.map((t: string) => t.split(' ')[0]);
             const retryRes: any = await ste.hunt(ActLib.PROGRESS_LIBRARY, { lst: retryTargets });
             if (retryRes?.libBit?.idx === 'progress-library-saga-error') {
                 await ste.hunt(ActMnu.SAGA_TORN_STATE_MENU, { dat: retryRes.libBit.dat });
@@ -199,8 +199,8 @@ export const sagaTornStateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State
             });
             // Invokes journal rollback helper
             const fs = require('fs-extra');
-            for (const target of [...sagaJournal.targetsCompleted].reverse()) {
-                const bkp = sagaJournal.backups?.[target];
+            for (const target of [...(sagaJournal as any).targetsCompleted].reverse()) {
+                const bkp = (sagaJournal as any).backups?.[target];
                 if (bkp && (await fs.pathExists(bkp))) {
                     await fs.remove(target).catch(() => {});
                     await fs.rename(bkp, target).catch(() => {});
