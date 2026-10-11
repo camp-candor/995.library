@@ -4,11 +4,17 @@ import type State from '../../99.core/state'
 import type NetBit from '../../81.grid.unit/fce/net.bit'
 import * as Color from '../../val/console-color'
 
-export const initChoice = (cpy: ChoiceModel, _bal: ChoiceBit, _ste: State) => {
+export const initChoice = (cpy: ChoiceModel, bal: ChoiceBit, _ste: State) => {
+    if (bal?.slv != null) {
+        bal.slv({ chcBit: { idx: 'init-choice' } })
+    }
     return cpy
 }
 
-export const updateChoice = (cpy: ChoiceModel, _bal: ChoiceBit, _ste: State) => {
+export const updateChoice = (cpy: ChoiceModel, bal: ChoiceBit, _ste: State) => {
+    if (bal?.slv != null) {
+        bal.slv({ chcBit: { idx: 'update-choice' } })
+    }
     return cpy
 }
 
@@ -17,13 +23,13 @@ export const openChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
     const blessed = terminal?.blessed
     const screen = terminal?.screen
 
-    // Defensive headless fallback for automated runners
+    // Defensive headless fallback for automated runners and CI environments
     if (!screen || !blessed) {
         if (bal?.slv != null) {
             bal.slv({
                 chcBit: {
                     idx: 'open-choice-headless',
-                    src: bal.lst && bal.lst.length > 0 ? bal.lst[0] : '',
+                    src: bal?.lst && bal.lst.length > 0 ? bal.lst[0] : '',
                     val: 0,
                 },
             })
@@ -32,11 +38,11 @@ export const openChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
     }
 
     const dat: any = { idx: 'choice-bit', clr0: Color.BLACK, clr1: Color.YELLOW }
-    for (const key in bal.dat) {
+    for (const key in bal?.dat) {
         dat[key] = bal.dat[key]
     }
 
-    const net: NetBit = bal.net || {
+    const net: NetBit = bal?.net || {
         left: 0,
         top: 0,
         width: '100%',
@@ -56,7 +62,7 @@ export const openChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
     })
 
     const buttons: any[] = []
-    const itemList: string[] = bal.lst || []
+    const itemList: string[] = bal?.lst || []
 
     itemList.forEach((itemText: string, index: number) => {
         const btn = blessed.button({
@@ -110,9 +116,15 @@ export const openChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
     const cleanup = () => {
         if (cleanedUp) return
         cleanedUp = true
+
+        // 1. Explicitly unbind all registered directional navigation keys
         screen.unkey(['up', 'k'], handleUp)
         screen.unkey(['down', 'j'], handleDown)
+
+        // 2. Detach and destroy widget subtree to liberate terminal memory
         form.destroy()
+
+        // 3. Request coordinate repaint
         screen.render()
     }
 
@@ -127,8 +139,16 @@ export const openChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
 
         cleanup()
 
-        if (bal.slv != null) {
+        if (bal?.slv != null) {
             bal.slv({ chcBit: { idx: 'open-choice', src, val } })
+        }
+    })
+
+    form.on('cancel', () => {
+        cleanup()
+
+        if (bal?.slv != null) {
+            bal.slv({ chcBit: { idx: 'open-choice-cancel', src: '', val: -1 } })
         }
     })
 
@@ -146,11 +166,13 @@ export const keyChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
     const screen = terminal?.screen
 
     if (!screen || !blessed) {
-        if (bal?.slv != null) bal.slv({ chcBit: { idx: 'key-choice-headless' } })
+        if (bal?.slv != null) {
+            bal.slv({ chcBit: { idx: 'key-choice-headless' } })
+        }
         return cpy
     }
 
-    const net: NetBit = bal.net || { left: 0, top: 0, width: '100%', height: '100%' }
+    const net: NetBit = bal?.net || { left: 0, top: 0, width: '100%', height: '100%' }
 
     blessed.listbar({
         parent: screen,
@@ -169,10 +191,15 @@ export const keyChoice = (cpy: ChoiceModel, bal: ChoiceBit, ste: State) => {
     })
 
     screen.render()
-    if (bal.slv != null) bal.slv({ chcBit: { idx: 'key-choice' } })
+    if (bal?.slv != null) {
+        bal.slv({ chcBit: { idx: 'key-choice' } })
+    }
     return cpy
 }
 
-export const towerChoice = (cpy: ChoiceModel, _bal: ChoiceBit, _ste: State) => {
+export const towerChoice = (cpy: ChoiceModel, bal: ChoiceBit, _ste: State) => {
+    if (bal?.slv != null) {
+        bal.slv({ chcBit: { idx: 'tower-choice' } })
+    }
     return cpy
 }
