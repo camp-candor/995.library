@@ -9,14 +9,14 @@ import * as COLOR from '../../val/console-color'
 
 let renderScheduled = false
 
-export const initConsole = (cpy: ConsoleModel, _bal: ConsoleBit, _ste: State) => {
+export const initConsole = (cpy: ConsoleModel, bal: ConsoleBit, _ste: State) => {
+    if (bal?.slv != null) bal.slv({ cnsBit: { idx: 'init-console' } })
     return cpy
 }
 
 function wrapConsoleLine(text: string, maxWidth: number): string[] {
     if (!text) return ['']
 
-    // Clamp repeating separator banners (e.g., >> ---- or ====) to maxWidth
     if (/^(?:>>\s*)?[-=_*~]{10,}$/.test(text)) {
         return [text.slice(0, maxWidth)]
     }
@@ -25,7 +25,6 @@ function wrapConsoleLine(text: string, maxWidth: number): string[] {
         return [text]
     }
 
-    // Detect indentation/prefix (e.g. ">> ", "- ", "* ")
     const prefixMatch = text.match(/^(\s*(?:>>|\*|-|•)\s*)/)
     const basePrefix = prefixMatch ? prefixMatch[1] : ''
     const contPrefix = basePrefix.trim() === '>>' ? '>>   ' : '   '
@@ -83,13 +82,13 @@ export const updateConsole = async (
     bal: ConsoleBit,
     ste: State,
 ) => {
-    const bit = await ste.hunt(ActCns.READ_CONSOLE, { idx: bal.idx })
-    const dat: TermBit = bit?.cnsBit?.dat
+    const bit = await ste.hunt(ActCns.READ_CONSOLE, { idx: bal?.idx || 'cns00' })
+    const dat: TermBit | undefined = bit?.cnsBit?.dat
 
-    if (bal.src == null) bal.src = ''
+    const textPayload = bal?.src || ''
 
     if (dat && dat.bit) {
-        const terminal: TerminalModel = ste.value.terminal
+        const terminal: TerminalModel | undefined = ste?.value?.terminal
 
         let maxWidth = 48
         if (typeof dat.bit.width === 'number' && dat.bit.width > 4) {
@@ -108,16 +107,15 @@ export const updateConsole = async (
             )
         }
 
-        const lines = wrapConsoleContent(bal.src, maxWidth)
+        const lines = wrapConsoleContent(textPayload, maxWidth)
         for (const line of lines) {
             dat.bit.log(line)
         }
 
-        // Asynchronous micro-task render decoupling
         scheduleScreenRender(terminal)
     }
 
-    if (bal.slv != null) bal.slv({ cnsBit: { idx: 'update-console' } })
+    if (bal?.slv != null) bal.slv({ cnsBit: { idx: 'update-console' } })
     return cpy
 }
 
@@ -126,15 +124,15 @@ export const createConsole = (
     bal: ConsoleBit,
     ste: State,
 ) => {
-    const terminal: TerminalModel = ste.value.terminal
+    const terminal: TerminalModel | undefined = ste?.value?.terminal
     const contrib = terminal?.contrib
     const screen = terminal?.screen
 
-    const dat: TermBit = { idx: 'hmm', bit: null, clr: null, net: null }
-    if (dat.clr == null) dat.clr = COLOR.GREEN
-
-    for (const key in bal.dat) {
-        dat[key] = bal.dat[key]
+    const dat: TermBit = {
+        idx: bal?.idx || 'cns00',
+        bit: null,
+        clr: bal?.dat?.clr || COLOR.GREEN,
+        net: bal?.dat?.net || null,
     }
 
     if (contrib && screen) {
@@ -157,7 +155,7 @@ export const createConsole = (
         screen.render()
     }
 
-    if (bal.slv != null) bal.slv({ cnsBit: { idx: 'create-console', dat } })
+    if (bal?.slv != null) bal.slv({ cnsBit: { idx: 'create-console', dat } })
     return cpy
 }
 
@@ -166,10 +164,10 @@ export const readConsole = async (
     bal: ConsoleBit,
     ste: State,
 ) => {
-    const slv = bal.slv
-    if (bal.idx == null) bal.idx = 'can00'
+    const slv = bal?.slv
+    const targetIdx = bal?.idx || 'can00'
     const bit = await ste.hunt(ActCol.READ_COLLECT, {
-        idx: bal.idx,
+        idx: targetIdx,
         bit: ActCns.CREATE_CONSOLE,
     })
     if (slv != null) {
@@ -183,15 +181,16 @@ export const writeConsole = async (
     bal: ConsoleBit,
     ste: State,
 ) => {
+    const targetIdx = bal?.idx || 'cns00'
     const bit = await ste.hunt(ActCol.WRITE_COLLECT, {
-        idx: bal.idx,
-        src: bal.src,
-        dat: bal.dat,
+        idx: targetIdx,
+        src: bal?.src,
+        dat: bal?.dat,
         bit: ActCns.CREATE_CONSOLE,
     })
-    await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: bal.idx, src: bal.src })
+    await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: targetIdx, src: bal?.src })
 
-    if (bal.slv != null) {
+    if (bal?.slv != null) {
         bal.slv({ cnsBit: { idx: 'write-console', dat: bit?.clcBit?.dat } })
     }
     return cpy
@@ -199,16 +198,18 @@ export const writeConsole = async (
 
 export const removeConsole = (
     cpy: ConsoleModel,
-    _bal: ConsoleBit,
+    bal: ConsoleBit,
     _ste: State,
 ) => {
+    if (bal?.slv != null) bal.slv({ cnsBit: { idx: 'remove-console' } })
     return cpy
 }
 
 export const deleteConsole = (
     cpy: ConsoleModel,
-    _bal: ConsoleBit,
+    bal: ConsoleBit,
     _ste: State,
 ) => {
+    if (bal?.slv != null) bal.slv({ cnsBit: { idx: 'delete-console' } })
     return cpy
 }
