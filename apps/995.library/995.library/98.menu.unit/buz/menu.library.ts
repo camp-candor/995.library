@@ -343,7 +343,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 
             await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
 
-            //debugger;
+
 
             bit = await ste.hunt(ActGrd.UPDATE_GRID, {
                 x: 0,
