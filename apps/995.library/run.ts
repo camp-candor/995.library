@@ -176,6 +176,20 @@ const init = async () => {
         })
 
         // 3. Dynamic Package Injection & Bus Wiring
+        const packagesDist = path.resolve(
+            import.meta.dirname,
+            '../../packages/dist',
+        )
+        if (fs.existsSync(packagesDist)) {
+            const distPkgJson = path.join(packagesDist, 'package.json')
+            if (!fs.existsSync(distPkgJson)) {
+                fs.writeFileSync(
+                    distPkgJson,
+                    JSON.stringify({ type: 'commonjs' }, null, 2),
+                )
+            }
+        }
+
         for (const pkg of existingPackages) {
             try {
                 let pkgDistPath = path.resolve(

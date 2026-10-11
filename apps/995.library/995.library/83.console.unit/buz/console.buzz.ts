@@ -140,9 +140,9 @@ export const createConsole = (
             fg: dat.clr,
             selectedFg: dat.clr,
             label: 'Console Log',
-            left: dat.net?.left ?? 0,
+            left: dat.net?.left ?? '33.33%',
             top: dat.net?.top ?? 0,
-            width: dat.net?.width ?? '100%',
+            width: dat.net?.width ?? '66.66%',
             height: dat.net?.height ?? '100%',
             bufferLength: 1000,
             scrollable: true,
@@ -170,8 +170,9 @@ export const readConsole = async (
         idx: targetIdx,
         bit: ActCns.CREATE_CONSOLE,
     })
+    const resDat = bit?.clcBit?.dat || bit?.colBit?.dat
     if (slv != null) {
-        slv({ cnsBit: { idx: 'read-console', dat: bit?.clcBit?.dat } })
+        slv({ cnsBit: { idx: 'read-console', dat: resDat } })
     }
     return cpy
 }
@@ -188,10 +189,11 @@ export const writeConsole = async (
         dat: bal?.dat,
         bit: ActCns.CREATE_CONSOLE,
     })
+    const resDat = bit?.clcBit?.dat || bit?.colBit?.dat
     await ste.hunt(ActCns.UPDATE_CONSOLE, { idx: targetIdx, src: bal?.src })
 
     if (bal?.slv != null) {
-        bal.slv({ cnsBit: { idx: 'write-console', dat: bit?.clcBit?.dat } })
+        bal.slv({ cnsBit: { idx: 'write-console', dat: resDat } })
     }
     return cpy
 }

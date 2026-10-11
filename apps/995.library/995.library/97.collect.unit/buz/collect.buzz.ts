@@ -38,7 +38,7 @@ export const fetchCollect = (
     if (bal.val == 1) bit = cabBit.bitList[0]
     else bit = cabBit
 
-    if (bal.slv != null) bal.slv({ colBit: { idx: 'fetch-collect', dat: bit } })
+    if (bal.slv != null) bal.slv({ colBit: { idx: 'fetch-collect', dat: bit }, clcBit: { idx: 'fetch-collect', dat: bit } } as any)
     return cpy
 }
 
@@ -65,7 +65,7 @@ export const readCollect = async (
         dat = cabBit.bitList[cabBit.bits[bal.idx]]
     }
 
-    if (bal.slv != null) bal.slv({ colBit: { idx: 'read-collect', dat } })
+    if (bal.slv != null) bal.slv({ colBit: { idx: 'read-collect', dat }, clcBit: { idx: 'read-collect', dat } } as any)
     return cpy
 }
 
@@ -131,7 +131,7 @@ export const writeCollect = async (
     if (dat == null && bal.slv != null)
         bal.slv({ colBit: { idx: 'write-collect-err', src: 'no-dat' } })
 
-    if (bal.slv != null) bal.slv({ colBit: { idx: 'write-collect', val, dat } })
+    if (bal.slv != null) bal.slv({ colBit: { idx: 'write-collect', val, dat }, clcBit: { idx: 'write-collect', val, dat } } as any)
 
     return cpy
 }

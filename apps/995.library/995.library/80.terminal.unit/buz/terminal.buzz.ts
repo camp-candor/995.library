@@ -143,6 +143,9 @@ export const clearTerminal = async (
     if (cpy.blessed) {
         try {
             cpy.blessed.program().clear()
+            if (cpy.screen && typeof cpy.screen.realloc === 'function') {
+                cpy.screen.realloc()
+            }
         } catch {
             // Ignore clear errors in headless/test runs
         }

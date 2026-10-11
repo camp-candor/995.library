@@ -16,7 +16,6 @@ import * as FOCUS from '../../val/focus'
 
 import * as ActMnu from '../menu.action'
 
-import * as ActGer from '../../05.gears.unit/gears.action'
 import * as ActTrm from '../../80.terminal.unit/terminal.action'
 import * as ActChc from '../../85.choice.unit/choice.action'
 import * as ActPut from '../../84.input.unit/input.action'
@@ -53,8 +52,6 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     })
 
     lst = [
-        ActGer.LORE_GEARS.split(']')[1],
-        ActGer.CREATE_GEARS.split(']')[1],
         ActUnt.UPDATE_UNIT.split(']')[1],
         ActAct.UPDATE_ACTION.split(']')[1],
         ActUnt.CREATE_UNIT.split(']')[1],
@@ -85,10 +82,6 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             '-List all the units\ncurrently in the library.',
         [ActLib.AUDIT_LIBRARY.split(']')[1]]:
             '-Compare fleet repositories against\nthe Central Coordination Manifest.',
-        [ActGer.LORE_GEARS.split(']')[1]]:
-            '-List all GEARS units\ncurrently in the library.',
-        [ActGer.CREATE_GEARS.split(']')[1]]:
-            '-List all GEARS units\ncurrently in the library.',
         [ActLib.LAUNCH_LIBRARY.split(']')[1]]: '-Launch library urls.',
         'ROOT MENU': '-Return to the root menu.',
     }
@@ -122,56 +115,6 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     switch (src) {
         case ActLib.LAUNCH_LIBRARY.split(']')[1]: {
             bit = await ste.hunt(ActLib.LAUNCH_LIBRARY, {})
-            break
-        }
-
-        case ActGer.LORE_GEARS.split(']')[1]: {
-            // Defensive clear before prompt allocation
-            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-            bit = await ste.hunt(ActGrd.UPDATE_GRID, {
-                x: 0,
-                y: 4,
-                xSpan: 4,
-                ySpan: 6,
-            })
-            bit = await ste.hunt(ActPut.OPEN_INPUT, {
-                dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
-                src: Align.VERTICAL,
-                lst,
-                txt: 'input verb',
-                net: bit.grdBit.dat,
-            })
-            src = bit.putBit.src
-
-            bit = await ste.hunt(ActGer.LORE_GEARS, { src, dat: { fs: FS } })
-            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-            bit = await ste.hunt(ActMnu.PRINT_MENU, bit)
-            bit = await ste.hunt(ActMnu.UPDATE_MENU)
-            break
-        }
-
-        case ActGer.CREATE_GEARS.split(']')[1]: {
-            // Defensive clear before prompt allocation
-            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-            bit = await ste.hunt(ActGrd.UPDATE_GRID, {
-                x: 0,
-                y: 4,
-                xSpan: 4,
-                ySpan: 6,
-            })
-            bit = await ste.hunt(ActPut.OPEN_INPUT, {
-                dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
-                src: Align.VERTICAL,
-                lst,
-                txt: 'input verb',
-                net: bit.grdBit.dat,
-            })
-            src = bit.putBit.src
-
-            bit = await ste.hunt(ActGer.CREATE_GEARS, { src, dat: { fs: FS } })
-            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-            bit = await ste.hunt(ActMnu.PRINT_MENU, bit)
-            bit = await ste.hunt(ActMnu.UPDATE_MENU)
             break
         }
 
