@@ -103,7 +103,7 @@ export const fleetMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 };
 
 export const sagaTornStateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
-    const sagaJournal = bal?.dat || {
+    const sagaJournal = (bal?.dat as any) || {
         sagaId: 'saga-fs-unknown',
         targetsCompleted: [],
         targetsFailed: ['target/unknown (ERROR)'],
