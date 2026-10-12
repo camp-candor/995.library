@@ -1,3 +1,4 @@
+import * as ActDrt from '../../06.directive.unit/directive.action'
 /* eslint-disable */
 import { MenuModel } from '../menu.model'
 import MenuBit from '../fce/menu.bit'
@@ -57,6 +58,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActAct.UPDATE_ACTION.split(']')[1],
         ActUnt.CREATE_UNIT.split(']')[1],
         ActPkg.CREATE_PACKAGE.split(']')[1],
+        ActDrt.DAY_DIRECTIVE.split(']')[1],
         ActUnt.FLATTEN_UNIT.split(']')[1],
         ActLib.FLAT_LIBRARY.split(']')[1],
         ActLib.PROGRESS_LIBRARY.split(']')[1],
@@ -76,18 +78,20 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             '-Create a new unit\nwith a specified verb.',
         [ActPkg.CREATE_PACKAGE.split(']')[1]]:
             '-Scaffold a new package\ninto data/package.',
+        [ActDrt.DAY_DIRECTIVE.split(']')[1]]:
+            '-Provision the next sequential\nday directive in data/directive.',
         [ActUnt.FLATTEN_UNIT.split(']')[1]]:
             '-Flatten a unit into\nits constituent files.',
         [ActLib.FLAT_LIBRARY.split(']')[1]]:
             '-Flatten library code\ninto data/flat.',
+        [ActLib.PROGRESS_LIBRARY.split(']')[1]]:
+            '-Synchronize 995.library across\nsibling repositories.',
         [ActLib.UPDATE_LIBRARY.split(']')[1]]:
             '-Regenerate the library\nwiring manifest (BEE.ts).',
         [ActLib.LIST_LIBRARY.split(']')[1]]:
             '-List all the units\ncurrently in the library.',
         [ActLib.AUDIT_LIBRARY.split(']')[1]]:
             '-Compare fleet repositories against\nthe Central Coordination Manifest.',
-        [ActLib.PROGRESS_LIBRARY.split(']')[1]]:
-            '-Synchronize 995.library across\nsibling repositories.',
         [ActLib.LAUNCH_LIBRARY.split(']')[1]]: '-Launch library urls.',
         'ROOT MENU': '-Return to the root menu.',
     }
@@ -119,6 +123,13 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     src = bit?.chcBit?.src
 
     switch (src) {
+        case ActDrt.DAY_DIRECTIVE.split(']')[1]: {
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+            bit = await ste.hunt(ActDrt.DAY_DIRECTIVE, {})
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+            bit = await ste.hunt(ActMnu.PRINT_MENU, bit)
+            break
+        }
         case ActLib.LAUNCH_LIBRARY.split(']')[1]: {
             bit = await ste.hunt(ActLib.LAUNCH_LIBRARY, {})
             break
