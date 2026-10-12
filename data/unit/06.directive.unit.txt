@@ -1,0 +1,124 @@
+// ----- SOURCE: apps/995.library/995.library/06.directive.unit/buz/directive.buzz.ts -----
+export const initDirective = (cpy: DirectiveModel, bal:DirectiveBit, ste: State) => {
+ debugger
+ return cpy;
+};
+
+export const updateDirective = (cpy: DirectiveModel, bal:DirectiveBit, ste: State) => {
+ return cpy;
+};
+
+
+import { DirectiveModel } from "../directive.model";
+import DirectiveBit from "../fce/directive.bit";
+import State from "../../99.core/state";
+
+export const dayDirective = async ( cpy: DirectiveModel, bal: DirectiveBit, ste: State,) => { if (ste) { await ste.hunt('[Console action] Update Console', { idx: 'cns00', src: '>> Executing dayDirective stub', }) } if (bal && bal.slv != null) { bal.slv({ dayBit: { idx: 'dayDirective-stub' } }) } return cpy}
+
+export const createDirective = async ( cpy: DirectiveModel, bal: DirectiveBit, ste: State,) => { if (ste) { await ste.hunt('[Console action] Update Console', { idx: 'cns00', src: '>> Executing createDirective stub', }) } if (bal && bal.slv != null) { bal.slv({ createBit: { idx: 'createDirective-stub' } }) } return cpy}
+
+
+// ----- SOURCE: apps/995.library/995.library/06.directive.unit/directive.action.ts -----
+import { Action } from "../99.core/interface/action.interface";
+import  DirectiveBit  from "./fce/directive.bit";
+
+// Directive actions
+
+export const INIT_DIRECTIVE = "[Directive action] Init Directive";
+export class InitDirective implements Action {
+ readonly type = INIT_DIRECTIVE;
+ constructor(public bale: DirectiveBit) {}
+}
+
+export const UPDATE_DIRECTIVE = "[Directive action] Update Directive";
+export class UpdateDirective implements Action {
+ readonly type = UPDATE_DIRECTIVE;
+ constructor(public bale: DirectiveBit) {}
+}
+
+export const DAY_DIRECTIVE = "[Day action] Day Directive";export class DayDirective implements Action { readonly type = DAY_DIRECTIVE; constructor(public bale: DirectiveBit) {}}
+
+export const CREATE_DIRECTIVE = "[Create action] Create Directive";export class CreateDirective implements Action { readonly type = CREATE_DIRECTIVE; constructor(public bale: DirectiveBit) {}}
+
+export type Actions = | InitDirective | UpdateDirective
+    | DayDirective
+    | CreateDirective;
+
+
+// ----- SOURCE: apps/995.library/995.library/06.directive.unit/directive.buzzer.ts -----
+export { initDirective  } from "./buz/directive.buzz";
+export { updateDirective  } from "./buz/directive.buzz";
+export { dayDirective } from "./buz/directive.buzz";
+export { createDirective } from "./buz/directive.buzz";
+
+
+// ----- SOURCE: apps/995.library/995.library/06.directive.unit/directive.model.ts -----
+import Directive from "./fce/directive.interface";
+import DirectiveBit from "./fce/directive.interface";
+
+export class DirectiveModel implements Directive {
+ //idx:string;
+ //directiveBitList: DirectiveBit[] = [];
+ //directiveBits: any = {};
+}
+
+
+// ----- SOURCE: apps/995.library/995.library/06.directive.unit/directive.reduce.ts -----
+import clone from "clone-deep";
+import * as Act from "./directive.action";
+import { DirectiveModel } from "./directive.model";
+import * as Buzz from "./directive.buzzer";
+import State from "../99.core/state";
+
+export function reducer(model: DirectiveModel = new DirectiveModel(), act: Act.Actions,  state?: State ) {
+ switch (act.type) {
+ 
+ case Act.UPDATE_DIRECTIVE:
+ return Buzz.updateDirective(clone(model), act.bale, state);
+
+ case Act.INIT_DIRECTIVE:
+ return Buzz.initDirective(clone(model), act.bale, state);
+ case Act.DAY_DIRECTIVE: return Buzz.dayDirective(clone(model), act.bale, state)
+ case Act.CREATE_DIRECTIVE: return Buzz.createDirective(clone(model), act.bale, state)
+
+
+
+ default:
+ return model;
+ }
+}
+
+
+// ----- SOURCE: apps/995.library/995.library/06.directive.unit/directive.unit.ts -----
+import State from "../99.core/state";
+
+export default class DirectiveUnit {
+
+ constructor(state: State) {
+ }
+}
+
+
+// ----- SOURCE: apps/995.library/995.library/06.directive.unit/fce/directive.bit.ts -----
+
+export default interface DirectiveBit {
+ idx: string;
+ src?: string;
+ val?: number;
+ dat?: any;
+ slv?: Function;
+}
+
+
+
+
+// ----- SOURCE: apps/995.library/995.library/06.directive.unit/fce/directive.interface.ts -----
+
+import  DirectiveBit  from "./directive.bit";
+
+export default interface Directive {
+ // idx:string;
+ // directiveBitList: DirectiveBit[];
+ // directiveBits:any;
+
+}

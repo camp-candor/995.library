@@ -12,6 +12,10 @@ export function reducer(model: DirectiveModel = new DirectiveModel(), act: Act.A
 
  case Act.INIT_DIRECTIVE:
  return Buzz.initDirective(clone(model), act.bale, state);
+ case Act.DAY_DIRECTIVE: return Buzz.dayDirective(clone(model), act.bale, state)
+ case Act.CREATE_DIRECTIVE: return Buzz.createDirective(clone(model), act.bale, state)
+
+
 
  default:
  return model;

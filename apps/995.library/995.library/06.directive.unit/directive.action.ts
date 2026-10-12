@@ -15,4 +15,10 @@ export class UpdateDirective implements Action {
  constructor(public bale: DirectiveBit) {}
 }
 
-export type Actions = | InitDirective | UpdateDirective ;
+export const DAY_DIRECTIVE = "[Day action] Day Directive";export class DayDirective implements Action { readonly type = DAY_DIRECTIVE; constructor(public bale: DirectiveBit) {}}
+
+export const CREATE_DIRECTIVE = "[Create action] Create Directive";export class CreateDirective implements Action { readonly type = CREATE_DIRECTIVE; constructor(public bale: DirectiveBit) {}}
+
+export type Actions = | InitDirective | UpdateDirective
+    | DayDirective
+    | CreateDirective;
