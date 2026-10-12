@@ -60,31 +60,6 @@ export const updateDirective = (cpy: DirectiveModel, _bal: DirectiveBit, _ste: S
     return cpy
 }
 
-const PHASE_WORDS: Record<number, string> = {
-    1: 'one',
-    2: 'two',
-    3: 'three',
-    4: 'four',
-    5: 'five',
-    6: 'six',
-    7: 'seven',
-    8: 'eight',
-    9: 'nine',
-    10: 'ten',
-    11: 'eleven',
-    12: 'twelve',
-    13: 'thirteen',
-    14: 'fourteen',
-    15: 'fifteen',
-    16: 'sixteen',
-    17: 'seventeen',
-    18: 'eighteen',
-    19: 'nineteen',
-    20: 'twenty',
-}
-
-const getPhaseWord = (num: number): string => PHASE_WORDS[num] || String(num)
-
 export const createDirective = async (
     cpy: DirectiveModel,
     bal: DirectiveBit,
@@ -427,4 +402,223 @@ export const dayDirective = async (
     return cpy
 }
 
-export const phaseDirective = async ( cpy: DirectiveModel, bal: DirectiveBit, ste: State,) => { if (ste) { await ste.hunt('[Console action] Update Console', { idx: 'cns00', src: '>> Executing phaseDirective stub', }) } if (bal && bal.slv != null) { bal.slv({ phaseBit: { idx: 'phaseDirective-stub' } }) } return cpy}
+
+
+
+
+
+
+
+
+
+const PHASE_WORDS: Record<number, string> = {
+    1: 'one',
+    2: 'two',
+    3: 'three',
+    4: 'four',
+    5: 'five',
+    6: 'six',
+    7: 'seven',
+    8: 'eight',
+    9: 'nine',
+    10: 'ten',
+    11: 'eleven',
+    12: 'twelve',
+    13: 'thirteen',
+    14: 'fourteen',
+    15: 'fifteen',
+    16: 'sixteen',
+    17: 'seventeen',
+    18: 'eighteen',
+    19: 'nineteen',
+    20: 'twenty',
+}
+
+const WORD_TO_PHASE: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12,
+    thirteen: 13,
+    fourteen: 14,
+    fifteen: 15,
+    sixteen: 16,
+    seventeen: 17,
+    eighteen: 18,
+    nineteen: 19,
+    twenty: 20,
+}
+
+const getPhaseWord = (num: number): string => PHASE_WORDS[num] || String(num)
+
+const parsePhaseWord = (word: string): number => {
+    const lower = word.toLowerCase().trim()
+    if (WORD_TO_PHASE[lower] != null) return WORD_TO_PHASE[lower]
+    const parsed = parseInt(lower, 10)
+    return isNaN(parsed) ? 1 : parsed
+}
+
+export const phaseDirective = async (
+    cpy: DirectiveModel,
+    bal: DirectiveBit,
+    ste: State,
+): Promise<DirectiveModel> => {
+    const fs = require('fs-extra')
+    const path = require('path')
+
+    const repoRoot = findRepoRoot()
+    const targetDay = (bal?.src || bal?.idx || 'day-004').replace(/\[\]/g, '').trim()
+    const targetDayDir = path.join(repoRoot, 'data', 'directive', targetDay)
+    const templateDayDir = path.join(repoRoot, 'data', 'directive', 'day-000')
+
+    try {
+        await fs.ensureDir(targetDayDir)
+
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [PHASE] Scanning ${targetDay} for sequential phase extension...`,
+            })
+        }
+
+        const entries = await fs.readdir(targetDayDir)
+
+        // 1. Calculate highest overall numeric prefix in directory
+        let maxPrefix = -1
+        let highestPhaseFilePrefix = -1
+        let lastPhaseWord = ''
+
+        for (const filename of entries) {
+            const prefixMatch = filename.match(/^(\d{3})\./)
+            if (prefixMatch) {
+                const prefixNum = parseInt(prefixMatch[1], 10)
+                if (prefixNum > maxPrefix) {
+                    maxPrefix = prefixNum
+                }
+
+                // Check if this file represents a phase directive
+                const phaseMatch = filename.match(/^(\d{3})\.phase-([a-zA-Z0-9]+)\./i)
+                if (phaseMatch) {
+                    if (prefixNum > highestPhaseFilePrefix) {
+                        highestPhaseFilePrefix = prefixNum
+                        lastPhaseWord = phaseMatch[2]
+                    }
+                }
+            }
+        }
+
+        // 2. Derive next phase number and word
+        let nextPhaseNum = 1
+        if (highestPhaseFilePrefix !== -1 && lastPhaseWord) {
+            const prevPhaseVal = parsePhaseWord(lastPhaseWord)
+            nextPhaseNum = prevPhaseVal + 1
+        }
+        const nextPhaseWord = getPhaseWord(nextPhaseNum)
+
+        // 3. Resolve template contents
+        const readTemplate = async (candidates: string[]): Promise<string> => {
+            const searchLocations = [templateDayDir, targetDayDir]
+            for (const loc of searchLocations) {
+                for (const name of candidates) {
+                    const candidatePath = path.join(loc, name)
+                    if (await fs.pathExists(candidatePath)) {
+                        return await fs.readFile(candidatePath, 'utf8')
+                    }
+                }
+            }
+            return ''
+        }
+
+        const julesTemplate = await readTemplate([
+            '000.xxxx.jules.md',
+            '000.xxxx.jules',
+            '000.jules.md',
+        ])
+
+        const agTestTemplate = await readTemplate([
+            '000.xxxxx.ag-test.md',
+            '000.xxxxx.ag-test',
+            '000.xxxxx.gravity.md',
+            '000.xxxxx.gravity',
+        ])
+
+        // 4. Provision File 1: *.jules.md
+        const nextSeq1 = maxPrefix + 1
+        const julesFilename = `${pad3(nextSeq1)}.phase-${nextPhaseWord}.jules.md`
+        const julesFilePath = path.join(targetDayDir, julesFilename)
+        await fs.writeFile(julesFilePath, julesTemplate, 'utf8')
+
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [OK] writing data/directive/${targetDay}/${julesFilename}`,
+            })
+        }
+
+        // 5. Provision File 2: *.ag-test.md
+        const nextSeq2 = nextSeq1 + 1
+        const agTestFilename = `${pad3(nextSeq2)}.phase-${nextPhaseWord}.ag-test.md`
+        const agTestFilePath = path.join(targetDayDir, agTestFilename)
+        await fs.writeFile(agTestFilePath, agTestTemplate, 'utf8')
+
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [OK] writing data/directive/${targetDay}/${agTestFilename}`,
+            })
+        }
+
+        const relDay = path.relative(repoRoot, targetDayDir).replace(/\\/g, '/')
+
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [OK] Appended phase-${nextPhaseWord} pair to ${relDay}`,
+            })
+        }
+
+        if (bal && bal.slv != null) {
+            bal.slv({
+                drtBit: {
+                    idx: 'phase-directive',
+                    src: relDay,
+                    val: nextPhaseNum,
+                    dat: {
+                        targetDay,
+                        phaseWord: nextPhaseWord,
+                        files: [julesFilename, agTestFilename],
+                    },
+                },
+                phaseBit: {
+                    idx: `phase-${nextPhaseWord}`,
+                    val: nextPhaseNum,
+                    src: relDay,
+                },
+            })
+        }
+    } catch (err: any) {
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `:: [FAIL] Error in phaseDirective: ${errorMsg}`,
+            })
+        }
+        if (bal && bal.slv != null) {
+            bal.slv({
+                drtBit: { idx: 'phase-directive-error', src: errorMsg },
+                phaseBit: { idx: 'phase-directive-error', src: errorMsg },
+            })
+        }
+    }
+
+    return cpy
+}

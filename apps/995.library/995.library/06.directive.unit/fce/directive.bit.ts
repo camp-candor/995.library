@@ -7,5 +7,6 @@ export default interface DirectiveBit<TDat = unknown, TLst = string> {
     slv?: (result: {
         drtBit?: Partial<DirectiveBit<TDat, TLst>>
         dayBit?: Partial<DirectiveBit<TDat, TLst>>
+        phaseBit?: Partial<DirectiveBit<TDat, TLst>>
     }) => void
 }
