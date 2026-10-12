@@ -21,8 +21,9 @@ export function reducer(
 
         case Act.CREATE_DIRECTIVE:
             return Buzz.createDirective(clone(model, true), act.bale, state)
- case Act.PHASE_DIRECTIVE: return Buzz.phaseDirective(clone(model), act.bale, state)
 
+        case Act.PHASE_DIRECTIVE:
+            return Buzz.phaseDirective(clone(model, true), act.bale, state)
 
         default:
             return model
