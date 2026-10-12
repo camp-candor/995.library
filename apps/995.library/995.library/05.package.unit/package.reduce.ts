@@ -12,6 +12,8 @@ export function reducer(model: PackageModel = new PackageModel(), act: Act.Actio
 
  case Act.INIT_PACKAGE:
  return Buzz.initPackage(clone(model), act.bale, state);
+ case Act.CREATE_PACKAGE: return Buzz.createPackage(clone(model), act.bale, state)
+
 
  default:
  return model;

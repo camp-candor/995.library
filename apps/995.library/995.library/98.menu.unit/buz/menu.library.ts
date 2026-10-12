@@ -426,19 +426,88 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             const selectedFullPath = path.join(targetPath, selectedDir)
 
             await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+
+            // Discover and list units (*.unit) within the selected project/workspace
+            let unitSearchDir = selectedFullPath
+            if (FS.existsSync(path.join(selectedFullPath, selectedDir))) {
+                unitSearchDir = path.join(selectedFullPath, selectedDir)
+            }
+
+            let unitDirs: string[] = []
+            try {
+                if (FS.existsSync(unitSearchDir)) {
+                    const entries = FS.readdirSync(unitSearchDir, {
+                        withFileTypes: true,
+                    })
+                    for (const entry of entries) {
+                        if (
+                            entry.isDirectory() &&
+                            /^\d{2}\..+\.unit$/.test(entry.name)
+                        ) {
+                            unitDirs.push(entry.name)
+                        }
+                    }
+                }
+            } catch {
+                // ignore read error
+            }
+
+            unitDirs.sort((a, b) => a.localeCompare(b))
+
+            let finalUnitToFlatten = selectedDir
+            let finalUnitPath = selectedFullPath
+
+            if (unitDirs.length > 0) {
+                let unitSelection = ''
+                dex = 0
+                while (unitSelection === '') {
+                    const items = unitDirs.slice(dex, dex + 10)
+                    const list = [...items]
+                    if (unitDirs.length > 10) list.push('MORE')
+
+                    bit = await ste.hunt(ActGrd.UPDATE_GRID, {
+                        x: 0,
+                        y: 4,
+                        xSpan: 4,
+                        ySpan: 12,
+                    })
+                    bit = await ste.hunt(ActChc.OPEN_CHOICE, {
+                        dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+                        src: Align.VERTICAL,
+                        lst: list,
+                        net: bit.grdBit.dat,
+                    })
+
+                    const res = bit?.chcBit?.src
+                    if (res === 'MORE') {
+                        dex = dex + 10 >= unitDirs.length ? 0 : dex + 10
+                        await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+                    } else if (res) {
+                        unitSelection = res
+                    } else {
+                        break
+                    }
+                }
+
+                if (!unitSelection) break
+                finalUnitToFlatten = unitSelection.replace(/[[\]]/g, '').trim()
+                finalUnitPath = path.join(unitSearchDir, finalUnitToFlatten)
+            }
+
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
             await ste.hunt(ActCns.UPDATE_CONSOLE, {
                 idx: 'cns00',
-                src: `Flattening ${targetFolder}/${selectedDir}... Please wait.`,
+                src: `Flattening ${finalUnitToFlatten}... Please wait.`,
             })
 
             const flattenUnitBit = await ste.hunt(ActUnt.FLATTEN_UNIT, {
-                idx: selectedDir,
-                src: selectedFullPath,
+                idx: finalUnitToFlatten,
+                src: finalUnitPath,
             })
 
             await ste.hunt(ActCns.UPDATE_CONSOLE, {
                 idx: 'cns00',
-                src: `Flattened to ${flattenUnitBit?.untBit?.src || selectedDir}`,
+                src: `Flattened to ${flattenUnitBit?.untBit?.src || finalUnitToFlatten}`,
             })
 
             bit = await ste.hunt(ActMnu.PRINT_MENU, flattenUnitBit)

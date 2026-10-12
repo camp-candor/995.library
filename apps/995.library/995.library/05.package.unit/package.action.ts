@@ -15,4 +15,7 @@ export class UpdatePackage implements Action {
  constructor(public bale: PackageBit) {}
 }
 
-export type Actions = | InitPackage | UpdatePackage ;
+export const CREATE_PACKAGE = "[Create action] Create Package";export class CreatePackage implements Action { readonly type = CREATE_PACKAGE; constructor(public bale: PackageBit) {}}
+
+export type Actions = | InitPackage | UpdatePackage
+    | CreatePackage;
