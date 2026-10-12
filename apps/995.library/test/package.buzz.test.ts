@@ -114,6 +114,7 @@ test.serial(
         let resolvedResult: any = null
         const bal = {
             idx: '105.gemini',
+            src: 'packages/103.factory',
             slv: (res: any) => {
                 resolvedResult = res
             },
