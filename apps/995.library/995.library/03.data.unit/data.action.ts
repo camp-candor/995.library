@@ -21,4 +21,7 @@ export class FrameData implements Action {
     constructor(public bale: DataBit) {}
 }
 
+export const FLAT_DATA = "[Flat action] Flat Data";export class FlatData implements Action { readonly type = FLAT_DATA; constructor(public bale: DataBit) {}}
+
 export type Actions = InitData | UpdateData | FrameData
+    | FlatData;
