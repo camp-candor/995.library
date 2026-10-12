@@ -16,6 +16,16 @@ test.serial(
 
         // Seed day-000 through day-004
         await fs.ensureDir(path.join(directiveDir, 'day-000'))
+        await fs.writeFile(
+            path.join(directiveDir, 'day-000', '800.refinement.cpn'),
+            '# Refinement Content',
+            'utf8',
+        )
+        await fs.writeFile(
+            path.join(directiveDir, 'day-000', '900.check-list.cpn'),
+            '# Check List Content',
+            'utf8',
+        )
         await fs.ensureDir(path.join(directiveDir, 'day-001'))
         await fs.ensureDir(path.join(directiveDir, 'day-002'))
         await fs.ensureDir(path.join(directiveDir, 'day-003'))
@@ -69,6 +79,18 @@ test.serial(
         t.true(await fs.pathExists(path.join(expectedDayDir, '000.xxxx.jules')))
         t.true(await fs.pathExists(path.join(expectedDayDir, '000.xxxxx.ag-test')))
         t.true(await fs.pathExists(path.join(expectedDayDir, '000.xxxxx.gravity')))
+
+        // Assert copied files from day-000 exist and match source content
+        t.true(await fs.pathExists(path.join(expectedDayDir, '800.refinement.cpn')))
+        t.true(await fs.pathExists(path.join(expectedDayDir, '900.check-list.cpn')))
+        t.is(
+            await fs.readFile(path.join(expectedDayDir, '800.refinement.cpn'), 'utf8'),
+            '# Refinement Content',
+        )
+        t.is(
+            await fs.readFile(path.join(expectedDayDir, '900.check-list.cpn'), 'utf8'),
+            '# Check List Content',
+        )
     },
 )
 
@@ -112,5 +134,7 @@ test.serial(
         const expectedDayDir = path.join(scratchEmpty, 'data', 'directive', 'day-000')
         t.true(await fs.pathExists(expectedDayDir))
         t.true(await fs.pathExists(path.join(expectedDayDir, '000.focus.cpn')))
+        t.true(await fs.pathExists(path.join(expectedDayDir, '800.refinement.cpn')))
+        t.true(await fs.pathExists(path.join(expectedDayDir, '900.check-list.cpn')))
     },
 )

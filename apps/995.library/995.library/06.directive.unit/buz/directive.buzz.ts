@@ -352,6 +352,35 @@ export const dayDirective = async (
             }
         }
 
+        // 3. Copy refinement and checklist files from day-000
+        const filesToCopy = [
+            '800.refinement.cpn',
+            '900.check-list.cpn',
+        ]
+
+        for (const filename of filesToCopy) {
+            const srcPath = path.join(directiveRootDir, 'day-000', filename)
+            const destPath = path.join(targetDayDir, filename)
+            const isSelf = path.resolve(srcPath) === path.resolve(destPath)
+
+            if (await fs.pathExists(srcPath)) {
+                if (!isSelf) {
+                    await fs.copyFile(srcPath, destPath)
+                }
+            } else {
+                await fs.writeFile(destPath, '', 'utf8')
+            }
+
+            if (ste) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: isSelf
+                        ? `>> [OK] writing data/directive/${daySlug}/${filename}`
+                        : `>> [OK] copying data/directive/${daySlug}/${filename}`,
+                })
+            }
+        }
+
         const relOutput = path.relative(repoRoot, targetDayDir).replace(/\\/g, '/')
 
         if (ste) {
@@ -369,7 +398,7 @@ export const dayDirective = async (
                     val: nextIndex,
                     dat: {
                         dayFolder: daySlug,
-                        files: templateFiles,
+                        files: [...templateFiles, ...filesToCopy],
                     },
                 },
                 dayBit: {
