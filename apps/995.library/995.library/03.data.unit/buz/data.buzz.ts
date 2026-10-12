@@ -145,4 +145,4 @@ export const frameData = async (
     return cpy
 }
 
-export const flatData = async ( cpy: DataModel, bal: DataBit, ste: State,) => { if (ste) { await ste.hunt('[Console action] Update Console', { idx: 'cns00', src: '>> Executing flatData stub', }) } if (bal && bal.slv != null) { bal.slv({ flatBit: { idx: 'flatData-stub' } }) } return cpy}
+export const flatData = async ( cpy: DataModel, bal: DataBit, ste: State,) => { if (ste) { await ste.hunt('[Console action] Update Console', { idx: 'cns00', src: '>> Executing flatData stub', }) } if (bal && bal.slv != null) { bal.slv({ datBit: { idx: 'flatData-stub' } }) } return cpy}
