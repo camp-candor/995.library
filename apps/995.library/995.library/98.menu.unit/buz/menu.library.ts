@@ -53,12 +53,13 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         src: '-----------',
     })
 
-    lst = [
+lst = [
         ActUnt.UPDATE_UNIT.split(']')[1],
         ActAct.UPDATE_ACTION.split(']')[1],
         ActUnt.CREATE_UNIT.split(']')[1],
         ActPkg.CREATE_PACKAGE.split(']')[1],
         ActDrt.DAY_DIRECTIVE.split(']')[1],
+        ActDrt.CREATE_DIRECTIVE.split(']')[1],
         ActUnt.FLATTEN_UNIT.split(']')[1],
         ActLib.FLAT_LIBRARY.split(']')[1],
         ActLib.PROGRESS_LIBRARY.split(']')[1],
@@ -69,7 +70,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         'ROOT MENU',
     ]
 
-    const descriptions: Record<string, string> = {
+const descriptions: Record<string, string> = {
         [ActUnt.UPDATE_UNIT.split(']')[1]]:
             '-Update an existing unit\nin the library.',
         [ActAct.UPDATE_ACTION.split(']')[1]]:
@@ -80,6 +81,8 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             '-Scaffold a new package\ninto data/package.',
         [ActDrt.DAY_DIRECTIVE.split(']')[1]]:
             '-Provision the next sequential\nday directive in data/directive.',
+        [ActDrt.CREATE_DIRECTIVE.split(']')[1]]:
+            '-Scaffold focus divider and\npaired phase directives.',
         [ActUnt.FLATTEN_UNIT.split(']')[1]]:
             '-Flatten a unit into\nits constituent files.',
         [ActLib.FLAT_LIBRARY.split(']')[1]]:
@@ -123,6 +126,144 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     src = bit?.chcBit?.src
 
     switch (src) {
+        case ActDrt.CREATE_DIRECTIVE.split(']')[1]: {
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+
+            const FS = require('fs')
+            const path = require('path')
+            let parentDir = process.cwd()
+            while (
+                parentDir &&
+                !(
+                    FS.existsSync(path.join(parentDir, 'apps')) &&
+                    FS.existsSync(path.join(parentDir, 'packages')) &&
+                    FS.existsSync(path.join(parentDir, 'package.json'))
+                )
+            ) {
+                const parent = path.dirname(parentDir)
+                if (parent === parentDir) break
+                parentDir = parent
+            }
+
+            const directiveRootDir = path.join(parentDir, 'data', 'directive')
+            let dayDirs: string[] = []
+
+            if (FS.existsSync(directiveRootDir)) {
+                const entries = FS.readdirSync(directiveRootDir, { withFileTypes: true })
+                dayDirs = entries
+                    .filter((e: any) => e.isDirectory() && /^day-\d+/i.test(e.name))
+                    .map((e: any) => e.name)
+                    .sort((a: string, b: string) =>
+                        b.localeCompare(a, undefined, { numeric: true }),
+                    )
+            }
+
+            if (dayDirs.length === 0) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> [NOTICE] No day directories found in data/directive/. Run Day Directive first.',
+                })
+                break
+            }
+
+            // Step 1: Select Day Directory Modal
+            bit = await ste.hunt(ActGrd.UPDATE_GRID, {
+                x: 0,
+                y: 4,
+                xSpan: 4,
+                ySpan: 12,
+            })
+            bit = await ste.hunt(ActChc.OPEN_CHOICE, {
+                dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+                src: Align.VERTICAL,
+                lst: dayDirs,
+                net: bit.grdBit.dat,
+            })
+            const selectedDay = bit?.chcBit?.src
+            if (!selectedDay) break
+
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+
+            // Step 2: Input Focus Divider Label Modal
+            bit = await ste.hunt(ActGrd.UPDATE_GRID, {
+                x: 0,
+                y: 4,
+                xSpan: 4,
+                ySpan: 6,
+            })
+            bit = await ste.hunt(ActPut.OPEN_INPUT, {
+                dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+                src: Align.VERTICAL,
+                lst,
+                txt: 'input focus label (e.g. modernize-media-pipeline)',
+                net: bit.grdBit.dat,
+            })
+            const labelInput = (bit?.putBit?.src || '').trim()
+            if (!labelInput) break
+
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+
+            // Step 3: Select Number of Phases Modal
+            const phaseOptions = [
+                '1 Phase',
+                '2 Phases',
+                '3 Phases',
+                '4 Phases',
+                '5 Phases',
+                'Custom',
+            ]
+            bit = await ste.hunt(ActGrd.UPDATE_GRID, {
+                x: 0,
+                y: 4,
+                xSpan: 4,
+                ySpan: 8,
+            })
+            bit = await ste.hunt(ActChc.OPEN_CHOICE, {
+                dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+                src: Align.VERTICAL,
+                lst: phaseOptions,
+                net: bit.grdBit.dat,
+            })
+            const phaseSelection = bit?.chcBit?.src
+            if (!phaseSelection) break
+
+            let finalPhaseCount = 1
+
+            if (phaseSelection === 'Custom') {
+                await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+                bit = await ste.hunt(ActGrd.UPDATE_GRID, {
+                    x: 0,
+                    y: 4,
+                    xSpan: 4,
+                    ySpan: 6,
+                })
+                bit = await ste.hunt(ActPut.OPEN_INPUT, {
+                    dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+                    src: Align.VERTICAL,
+                    lst,
+                    txt: 'input number of phases (integer)',
+                    net: bit.grdBit.dat,
+                })
+                const customInt = parseInt(bit?.putBit?.src || '1', 10)
+                finalPhaseCount = isNaN(customInt) || customInt < 1 ? 1 : customInt
+            } else {
+                finalPhaseCount = parseInt(phaseSelection.split(' ')[0], 10) || 1
+            }
+
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+
+            // Step 4: Dispatch CREATE_DIRECTIVE
+            const createRes = await ste.hunt(ActDrt.CREATE_DIRECTIVE, {
+                src: selectedDay,
+                idx: labelInput,
+                val: finalPhaseCount,
+            })
+
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+            bit = await ste.hunt(ActMnu.PRINT_MENU, createRes)
+            break
+        }
+
         case ActDrt.DAY_DIRECTIVE.split(']')[1]: {
             await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
             bit = await ste.hunt(ActDrt.DAY_DIRECTIVE, {})
