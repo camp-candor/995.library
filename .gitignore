@@ -79,3 +79,4 @@ data/saga/active.json
 data/package/
 /data/package
 /data/unit
+/data/flatten
