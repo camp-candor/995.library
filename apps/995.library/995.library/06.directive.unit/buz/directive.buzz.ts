@@ -426,3 +426,5 @@ export const dayDirective = async (
 
     return cpy
 }
+
+export const phaseDirective = async ( cpy: DirectiveModel, bal: DirectiveBit, ste: State,) => { if (ste) { await ste.hunt('[Console action] Update Console', { idx: 'cns00', src: '>> Executing phaseDirective stub', }) } if (bal && bal.slv != null) { bal.slv({ phaseBit: { idx: 'phaseDirective-stub' } }) } return cpy}

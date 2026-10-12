@@ -2,3 +2,4 @@ export { initDirective } from './buz/directive.buzz'
 export { updateDirective } from './buz/directive.buzz'
 export { dayDirective } from './buz/directive.buzz'
 export { createDirective } from './buz/directive.buzz'
+export { phaseDirective } from "./buz/directive.buzz";
