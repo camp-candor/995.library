@@ -202,8 +202,8 @@ const descriptions: Record<string, string> = {
                 txt: 'input focus label (e.g. modernize-media-pipeline)',
                 net: bit.grdBit.dat,
             })
-            const labelInput = (bit?.putBit?.src || '').trim()
-            if (!labelInput) break
+            const rawLabelInput = (bit?.putBit?.src || '').trim()
+            if (!rawLabelInput) break
 
             await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
 
@@ -259,7 +259,7 @@ const descriptions: Record<string, string> = {
             // Step 4: Dispatch CREATE_DIRECTIVE
             const createRes = await ste.hunt(ActDrt.CREATE_DIRECTIVE, {
                 src: selectedDay,
-                idx: labelInput,
+                idx: rawLabelInput,
                 val: finalPhaseCount,
             })
 
