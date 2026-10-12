@@ -3,6 +3,31 @@ import type { DirectiveModel } from '../directive.model'
 import type DirectiveBit from '../fce/directive.bit'
 import type State from '../../99.core/state'
 
+const slugify = require('slugify')
+
+const pad3 = (num: number): string => String(num).padStart(3, '0')
+
+/**
+ * Normalizes a raw focus label string into a clean URL/filename-safe slug.
+ * Transforms whitespace, underscores, and special characters into hyphens.
+ */
+export const toSlug = (raw: string): string => {
+    if (!raw) return 'focus'
+    const manual = raw
+            .toLowerCase()
+            .trim()
+            .replace(/[\s_]+/g, '-')
+            .replace(/[^a-z0-9-]/g, '')
+            .replace(/-+/g, '-')
+            .replace(/^-+|-+$/g, '') || 'focus'
+    try {
+        let cleanRaw = raw.replace(/_/g, '-').replace(/[^a-zA-Z0-9 -]/g, '')
+        const slug = slugify(cleanRaw, { lower: true, strict: true, trim: true })
+        if (slug && slug.length > 0) return slug
+    } catch {}
+    return manual
+}
+
 const isRepoRoot = (dir: string): boolean => {
     const fs = require('fs')
     const path = require('path')
@@ -59,7 +84,6 @@ const PHASE_WORDS: Record<number, string> = {
 }
 
 const getPhaseWord = (num: number): string => PHASE_WORDS[num] || String(num)
-const pad3 = (num: number): string => String(num).padStart(3, '0')
 
 export const createDirective = async (
     cpy: DirectiveModel,
@@ -87,6 +111,7 @@ export const createDirective = async (
     }
     const targetDay = (bal?.src || 'day-000').replace(/[[\]]/g, '').trim()
     const rawLabel = (bal?.idx || 'focus').trim()
+    const slugLabel = toSlug(rawLabel)
     const phaseCount = typeof bal?.val === 'number' && bal.val > 0 ? bal.val : 1
 
     const targetDayDir = path.join(repoRoot, 'data', 'directive', targetDay)
@@ -139,7 +164,7 @@ export const createDirective = async (
             'focus.cpn',
         ])
 
-        const dividerFileName = `${pad3(currentSeq)}.${rawLabel}.cpn`
+        const dividerFileName = `${pad3(currentSeq)}.${slugLabel}.cpn`
         const dividerFilePath = path.join(targetDayDir, dividerFileName)
         await fs.writeFile(dividerFilePath, focusTemplateContent, 'utf8')
         createdFiles.push(dividerFileName)
@@ -224,7 +249,7 @@ export const createDirective = async (
                     val: createdFiles.length,
                     dat: {
                         targetDay,
-                        label: rawLabel,
+                        label: slugLabel,
                         files: createdFiles,
                     },
                 },
