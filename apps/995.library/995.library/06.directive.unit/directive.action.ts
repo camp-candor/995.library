@@ -25,10 +25,15 @@ export class CreateDirective implements Action<DirectiveBit> {
     constructor(public bale: DirectiveBit) {}
 }
 
-export const PHASE_DIRECTIVE = "[Phase action] Phase Directive";export class PhaseDirective implements Action { readonly type = PHASE_DIRECTIVE; constructor(public bale: DirectiveBit) {}}
+export const PHASE_DIRECTIVE = '[Phase action] Phase Directive'
+export class PhaseDirective implements Action<DirectiveBit> {
+    readonly type = PHASE_DIRECTIVE
+    constructor(public bale: DirectiveBit) {}
+}
 
-export type Actions = | InitDirective
+export type Actions =
+    | InitDirective
     | UpdateDirective
     | DayDirective
     | CreateDirective
-    | PhaseDirective;
+    | PhaseDirective
