@@ -6,6 +6,7 @@ import State from '../../99.core/state'
 import * as ActLib from '../../00.library.unit/library.action'
 import * as ActUnt from '../../01.unit.unit/unit.action'
 import * as ActAct from '../../02.action.unit/action.action'
+import * as ActPkg from '../../05.package.unit/package.action'
 
 import * as Grid from '../../val/grid'
 import * as Align from '../../val/align'
@@ -55,6 +56,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActUnt.UPDATE_UNIT.split(']')[1],
         ActAct.UPDATE_ACTION.split(']')[1],
         ActUnt.CREATE_UNIT.split(']')[1],
+        ActPkg.CREATE_PACKAGE.split(']')[1],
         ActUnt.FLATTEN_UNIT.split(']')[1],
         ActLib.FLAT_LIBRARY.split(']')[1],
         ActLib.PROGRESS_LIBRARY.split(']')[1],
@@ -72,6 +74,8 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             '-Update an action for\na specific unit \nso the library can use the action',
         [ActUnt.CREATE_UNIT.split(']')[1]]:
             '-Create a new unit\nwith a specified verb.',
+        [ActPkg.CREATE_PACKAGE.split(']')[1]]:
+            '-Scaffold a new package\ninto data/package.',
         [ActUnt.FLATTEN_UNIT.split(']')[1]]:
             '-Flatten a unit into\nits constituent files.',
         [ActLib.FLAT_LIBRARY.split(']')[1]]:
@@ -159,6 +163,34 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
 
             const updateActionBit = await ste.hunt(ActAct.UPDATE_ACTION, { idx, src })
             await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+            break
+        }
+
+
+        case ActPkg.CREATE_PACKAGE.split(']')[1]: {
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+            bit = await ste.hunt(ActGrd.UPDATE_GRID, {
+                x: 0,
+                y: 4,
+                xSpan: 4,
+                ySpan: 6,
+            })
+            bit = await ste.hunt(ActPut.OPEN_INPUT, {
+                dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+                src: Align.VERTICAL,
+                lst,
+                txt: 'input package verb (e.g. 104.hotkey)',
+                net: bit.grdBit.dat,
+            })
+            idx = bit?.putBit?.src
+
+            if (idx) {
+                const createPkgBit = await ste.hunt(ActPkg.CREATE_PACKAGE, { idx })
+                await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+                bit = await ste.hunt(ActMnu.PRINT_MENU, createPkgBit)
+            } else {
+                await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+            }
             break
         }
 
