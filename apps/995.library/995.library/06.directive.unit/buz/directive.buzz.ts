@@ -13,7 +13,8 @@ const pad3 = (num: number): string => String(num).padStart(3, '0')
  */
 export const toSlug = (raw: string): string => {
     if (!raw) return 'focus'
-    const manual = raw
+    const manual =
+        raw
             .toLowerCase()
             .trim()
             .replace(/[\s_]+/g, '-')
@@ -83,7 +84,37 @@ const PHASE_WORDS: Record<number, string> = {
     20: 'twenty',
 }
 
+const WORD_TO_PHASE: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    eleven: 11,
+    twelve: 12,
+    thirteen: 13,
+    fourteen: 14,
+    fifteen: 15,
+    sixteen: 16,
+    seventeen: 17,
+    eighteen: 18,
+    nineteen: 19,
+    twenty: 20,
+}
+
 const getPhaseWord = (num: number): string => PHASE_WORDS[num] || String(num)
+
+const parsePhaseWord = (word: string): number => {
+    const lower = word.toLowerCase().trim()
+    if (WORD_TO_PHASE[lower] != null) return WORD_TO_PHASE[lower]
+    const parsed = parseInt(lower, 10)
+    return isNaN(parsed) ? 1 : parsed
+}
 
 export const createDirective = async (
     cpy: DirectiveModel,
@@ -93,22 +124,7 @@ export const createDirective = async (
     const fs = require('fs-extra')
     const path = require('path')
 
-    let repoRoot = process.cwd()
-    while (
-        repoRoot &&
-        !(
-            fs.existsSync(path.join(repoRoot, 'apps')) &&
-            fs.existsSync(path.join(repoRoot, 'packages')) &&
-            fs.existsSync(path.join(repoRoot, 'package.json'))
-        )
-    ) {
-        const parent = path.dirname(repoRoot)
-        if (parent === repoRoot) {
-            repoRoot = process.cwd()
-            break
-        }
-        repoRoot = parent
-    }
+    const repoRoot = findRepoRoot()
     const targetDay = (bal?.src || 'day-000').replace(/[[\]]/g, '').trim()
     const rawLabel = (bal?.idx || 'focus').trim()
     const slugLabel = toSlug(rawLabel)
@@ -144,7 +160,6 @@ export const createDirective = async (
         let currentSeq = maxPrefix + 1
         const createdFiles: string[] = []
 
-        // Helper to resolve template content with fallback extensions
         const readTemplateContent = async (baseNames: string[]): Promise<string> => {
             const searchDirs = [templateDayDir, targetDayDir]
             for (const dir of searchDirs) {
@@ -190,7 +205,6 @@ export const createDirective = async (
             '000.xxxxx.ag-test',
         ])
 
-        // Determine secondary check suffix (gravity.md vs ag-test.md)
         let checkExt = 'gravity.md'
         if (
             (await fs.pathExists(path.join(templateDayDir, '000.xxxxx.ag-test.md'))) &&
@@ -203,7 +217,6 @@ export const createDirective = async (
         for (let p = 1; p <= phaseCount; p++) {
             const phaseWord = getPhaseWord(p)
 
-            // 4a. Jules Phase Directive
             currentSeq++
             const julesFileName = `${pad3(currentSeq)}.phase-${phaseWord}.jules.md`
             const julesFilePath = path.join(targetDayDir, julesFileName)
@@ -217,7 +230,6 @@ export const createDirective = async (
                 })
             }
 
-            // 4b. Gravity / AG-Test Verification Directive
             currentSeq++
             const gravityFileName = `${pad3(currentSeq)}.phase-${phaseWord}.${checkExt}`
             const gravityFilePath = path.join(targetDayDir, gravityFileName)
@@ -284,28 +296,12 @@ export const dayDirective = async (
     const fs = require('fs-extra')
     const path = require('path')
 
-    let repoRoot = process.cwd()
-    while (
-        repoRoot &&
-        !(
-            fs.existsSync(path.join(repoRoot, 'apps')) &&
-            fs.existsSync(path.join(repoRoot, 'packages')) &&
-            fs.existsSync(path.join(repoRoot, 'package.json'))
-        )
-    ) {
-        const parent = path.dirname(repoRoot)
-        if (parent === repoRoot) {
-            repoRoot = process.cwd()
-            break
-        }
-        repoRoot = parent
-    }
+    const repoRoot = findRepoRoot()
     const directiveRootDir = path.join(repoRoot, 'data', 'directive')
 
     try {
         await fs.ensureDir(directiveRootDir)
 
-        // 1. Scan existing day folders to determine the next sequential index
         const entries = await fs.readdir(directiveRootDir, { withFileTypes: true })
         let maxIndex = -1
 
@@ -333,7 +329,6 @@ export const dayDirective = async (
 
         await fs.ensureDir(targetDayDir)
 
-        // 2. Provision template files
         const templateFiles = [
             '000.focus.cpn',
             '000.xxxx.jules',
@@ -352,7 +347,6 @@ export const dayDirective = async (
             }
         }
 
-        // 3. Copy refinement and checklist files from day-000
         const filesToCopy = [
             '800.refinement.cpn',
             '900.check-list.cpn',
@@ -427,4 +421,159 @@ export const dayDirective = async (
     return cpy
 }
 
-export const phaseDirective = async ( cpy: DirectiveModel, bal: DirectiveBit, ste: State,) => { if (ste) { await ste.hunt('[Console action] Update Console', { idx: 'cns00', src: '>> Executing phaseDirective stub', }) } if (bal && bal.slv != null) { bal.slv({ phaseBit: { idx: 'phaseDirective-stub' } }) } return cpy}
+export const phaseDirective = async (
+    cpy: DirectiveModel,
+    bal: DirectiveBit,
+    ste: State,
+): Promise<DirectiveModel> => {
+    const fs = require('fs-extra')
+    const path = require('path')
+
+    const repoRoot = findRepoRoot()
+    const targetDay = (bal?.src || bal?.idx || 'day-004').replace(/[[\]]/g, '').trim()
+    const targetDayDir = path.join(repoRoot, 'data', 'directive', targetDay)
+    const templateDayDir = path.join(repoRoot, 'data', 'directive', 'day-000')
+
+    try {
+        await fs.ensureDir(targetDayDir)
+
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [PHASE] Scanning ${targetDay} for sequential phase extension...`,
+            })
+        }
+
+        const entries = await fs.readdir(targetDayDir)
+
+        // 1. Calculate highest overall numeric prefix in directory
+        let maxPrefix = -1
+        let highestPhaseFilePrefix = -1
+        let lastPhaseWord = ''
+
+        for (const filename of entries) {
+            const prefixMatch = filename.match(/^(\d{3})\./)
+            if (prefixMatch) {
+                const prefixNum = parseInt(prefixMatch[1], 10)
+                if (prefixNum > maxPrefix) {
+                    maxPrefix = prefixNum
+                }
+
+                // Check if this file represents a phase directive
+                const phaseMatch = filename.match(/^(\d{3})\.phase-([a-zA-Z0-9]+)\./i)
+                if (phaseMatch) {
+                    if (prefixNum > highestPhaseFilePrefix) {
+                        highestPhaseFilePrefix = prefixNum
+                        lastPhaseWord = phaseMatch[2]
+                    }
+                }
+            }
+        }
+
+        // 2. Derive next phase number and word
+        let nextPhaseNum = 1
+        if (highestPhaseFilePrefix !== -1 && lastPhaseWord) {
+            const prevPhaseVal = parsePhaseWord(lastPhaseWord)
+            nextPhaseNum = prevPhaseVal + 1
+        }
+        const nextPhaseWord = getPhaseWord(nextPhaseNum)
+
+        // 3. Resolve template contents
+        const readTemplate = async (candidates: string[]): Promise<string> => {
+            const searchLocations = [templateDayDir, targetDayDir]
+            for (const loc of searchLocations) {
+                for (const name of candidates) {
+                    const candidatePath = path.join(loc, name)
+                    if (await fs.pathExists(candidatePath)) {
+                        return await fs.readFile(candidatePath, 'utf8')
+                    }
+                }
+            }
+            return ''
+        }
+
+        const julesTemplate = await readTemplate([
+            '000.xxxx.jules.md',
+            '000.xxxx.jules',
+            '000.jules.md',
+        ])
+
+        const agTestTemplate = await readTemplate([
+            '000.xxxxx.ag-test.md',
+            '000.xxxxx.ag-test',
+            '000.xxxxx.gravity.md',
+            '000.xxxxx.gravity',
+        ])
+
+        // 4. Provision File 1: *.jules.md
+        const nextSeq1 = maxPrefix + 1
+        const julesFilename = `${pad3(nextSeq1)}.phase-${nextPhaseWord}.jules.md`
+        const julesFilePath = path.join(targetDayDir, julesFilename)
+        await fs.writeFile(julesFilePath, julesTemplate, 'utf8')
+
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [OK] writing data/directive/${targetDay}/${julesFilename}`,
+            })
+        }
+
+        // 5. Provision File 2: *.ag-test.md
+        const nextSeq2 = nextSeq1 + 1
+        const agTestFilename = `${pad3(nextSeq2)}.phase-${nextPhaseWord}.ag-test.md`
+        const agTestFilePath = path.join(targetDayDir, agTestFilename)
+        await fs.writeFile(agTestFilePath, agTestTemplate, 'utf8')
+
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [OK] writing data/directive/${targetDay}/${agTestFilename}`,
+            })
+        }
+
+        const relDay = path.relative(repoRoot, targetDayDir).replace(/\\/g, '/')
+
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [OK] Appended phase-${nextPhaseWord} pair to ${relDay}`,
+            })
+        }
+
+        if (bal && bal.slv != null) {
+            bal.slv({
+                drtBit: {
+                    idx: 'phase-directive',
+                    src: relDay,
+                    val: nextPhaseNum,
+                    dat: {
+                        targetDay,
+                        phaseWord: nextPhaseWord,
+                        files: [julesFilename, agTestFilename],
+                    },
+                },
+                phaseBit: {
+                    idx: `phase-${nextPhaseWord}`,
+                    val: nextPhaseNum,
+                    src: relDay,
+                },
+            })
+        }
+    } catch (err: any) {
+        const errorMsg = err instanceof Error ? err.message : String(err)
+        if (ste) {
+            await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `:: [FAIL] Error in phaseDirective: ${errorMsg}`,
+            })
+        }
+        if (bal && bal.slv != null) {
+            bal.slv({
+                drtBit: { idx: 'phase-directive-error', src: errorMsg },
+                phaseBit: { idx: 'phase-directive-error', src: errorMsg },
+            })
+        }
+    }
+
+    return cpy
+}
