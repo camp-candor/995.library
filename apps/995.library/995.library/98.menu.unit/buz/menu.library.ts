@@ -1,3 +1,4 @@
+import * as ActDat from '../../03.data.unit/data.action'
 import * as ActDrt from '../../06.directive.unit/directive.action'
 /* eslint-disable */
 import { MenuModel } from '../menu.model'
@@ -54,6 +55,7 @@ export const libraryMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
     })
 
 lst = [
+        ActDat.FLAT_DATA.split(']')[1],
         ActUnt.UPDATE_UNIT.split(']')[1],
         ActAct.UPDATE_ACTION.split(']')[1],
         ActUnt.CREATE_UNIT.split(']')[1],
@@ -71,6 +73,8 @@ lst = [
     ]
 
 const descriptions: Record<string, string> = {
+        [ActDat.FLAT_DATA.split(']')[1]]:
+            '-Consolidate files in data/flatten\ninto a single file in data/flat.',
         [ActUnt.UPDATE_UNIT.split(']')[1]]:
             '-Update an existing unit\nin the library.',
         [ActAct.UPDATE_ACTION.split(']')[1]]:
@@ -126,6 +130,76 @@ const descriptions: Record<string, string> = {
     src = bit?.chcBit?.src
 
     switch (src) {
+        case ActDat.FLAT_DATA.split(']')[1]: {
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+
+            let parentDir = process.cwd()
+            while (
+                parentDir &&
+                !(
+                    FS.existsSync(path.join(parentDir, 'apps')) &&
+                    FS.existsSync(path.join(parentDir, 'packages')) &&
+                    FS.existsSync(path.join(parentDir, 'package.json'))
+                )
+            ) {
+                const parent = path.dirname(parentDir)
+                if (parent === parentDir) break
+                parentDir = parent
+            }
+
+            const flattenDir = path.join(parentDir, 'data', 'flatten')
+            await FS.ensureDir(flattenDir)
+
+            const entries = FS.readdirSync(flattenDir, { withFileTypes: true })
+            const files = entries
+                .filter((e: any) => e.isFile())
+                .map((e: any) => e.name)
+                .sort((a: string, b: string) => a.localeCompare(b))
+
+            if (files.length === 0) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> [NOTICE] No files found in data/flatten to consolidate.',
+                })
+                break
+            }
+
+            bit = await ste.hunt(ActGrd.UPDATE_GRID, {
+                x: 0,
+                y: 4,
+                xSpan: 4,
+                ySpan: 12,
+            })
+            bit = await ste.hunt(ActChc.OPEN_CHOICE, {
+                dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+                src: Align.VERTICAL,
+                lst: files,
+                net: bit.grdBit.dat,
+            })
+            const selectedFileName = bit?.chcBit?.src
+
+            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+
+            if (selectedFileName) {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> [FLAT] Consolidating data/flatten into data/flat/${selectedFileName}...`,
+                })
+
+                const flatRes = await ste.hunt(ActDat.FLAT_DATA, {
+                    src: selectedFileName,
+                })
+
+                await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
+                bit = await ste.hunt(ActMnu.PRINT_MENU, flatRes)
+            } else {
+                await ste.hunt(ActCns.UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: '>> [ABORT] File consolidation cancelled.',
+                })
+            }
+            break
+        }
         case ActDrt.CREATE_DIRECTIVE.split(']')[1]: {
             await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
 
