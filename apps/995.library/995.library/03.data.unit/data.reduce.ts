@@ -18,8 +18,9 @@ export function reducer(
 
         case Act.FRAME_DATA:
             return Buzz.frameData(clone(model, true), act.bale, state)
- case Act.FLAT_DATA: return Buzz.flatData(clone(model), act.bale, state)
 
+        case Act.FLAT_DATA:
+            return Buzz.flatData(clone(model, true), act.bale, state)
 
         default:
             return model
