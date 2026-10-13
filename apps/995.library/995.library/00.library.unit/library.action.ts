@@ -92,6 +92,19 @@ export class ResolveLockfileHumanGate implements Action<LibraryBit> {
     constructor(public bale: LibraryBit) {}
 }
 
+
+export const PROMOTE_LOCKFILE_SCRATCHPAD = '[Lockfile action] Promote Lockfile Scratchpad'
+export class PromoteLockfileScratchpad implements Action<LibraryBit> {
+    readonly type = PROMOTE_LOCKFILE_SCRATCHPAD
+    constructor(public bale: LibraryBit) {}
+}
+
+export const MINT_LOCKFILE_LEDGER = '[Lockfile action] Mint Lockfile Ledger'
+export class MintLockfileLedger implements Action<LibraryBit> {
+    readonly type = MINT_LOCKFILE_LEDGER
+    constructor(public bale: LibraryBit) {}
+}
+
 export type Actions =
     | CheckGitWorkingTree
     | ProgressLibrarySaga
@@ -108,3 +121,5 @@ export type Actions =
     | PurgeLockfileScratchpad
     | ValidateLockfileScratchpad
     | ResolveLockfileHumanGate
+    | PromoteLockfileScratchpad
+    | MintLockfileLedger
