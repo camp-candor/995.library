@@ -105,6 +105,12 @@ export class MintLockfileLedger implements Action<LibraryBit> {
     constructor(public bale: LibraryBit) {}
 }
 
+export const BUMP_FLEET_VERSION = '[Release action] Bump Fleet Version'
+export class BumpFleetVersion implements Action<LibraryBit> {
+    readonly type = BUMP_FLEET_VERSION
+    constructor(public bale: LibraryBit) {}
+}
+
 export type Actions =
     | CheckGitWorkingTree
     | ProgressLibrarySaga
@@ -123,3 +129,4 @@ export type Actions =
     | ResolveLockfileHumanGate
     | PromoteLockfileScratchpad
     | MintLockfileLedger
+    | BumpFleetVersion
