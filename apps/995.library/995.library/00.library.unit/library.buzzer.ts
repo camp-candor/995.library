@@ -27,3 +27,9 @@ export {
     validateGate3MonotonicCompatibility,
     validateLockfileScratchpad,
 } from './buz/validation.buzz'
+export {
+    annotateScratchpadWithErrors,
+    compileCircuitBreakerDossier,
+    emitDossierTelemetry,
+    resolveLockfileHumanGate,
+} from './buz/circuit-breaker.buzz'
