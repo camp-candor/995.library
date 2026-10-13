@@ -32,7 +32,13 @@ test('Phase 1 Arbitration -- Reducer routes suspend, resume, and edit actions cl
     const reducedResume = reducer(model, new ActTrm.ResumeTerminal({}))
     t.truthy(reducedResume)
 
-    const reducedEdit = reducer(model, new ActTrm.EditTerminal({ src: 'test.json' }))
+    const reducedEdit = reducer(
+        model,
+        new ActTrm.EditTerminal({
+            src: 'test.json',
+            dat: { editor: 'node', args: ['-e', 'process.exit(0)'] },
+        }),
+    )
     t.truthy(reducedEdit)
 })
 
