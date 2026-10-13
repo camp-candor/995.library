@@ -19,3 +19,11 @@ export { finalizeSagaJournal } from './buz/library.buzz';
 export { auditLibrary } from './buz/library.buzz';
 export { resolveRepoRoot } from './buz/library.buzz';
 export { analyzeManifestDivergence, synthesizeConflictScratchpad, stageLockfileConflict, purgeLockfileScratchpad } from './buz/lockfile.buzz'
+
+export {
+    stripConflictComments,
+    validateGate1Schema,
+    validateGate2CommitReachability,
+    validateGate3MonotonicCompatibility,
+    validateLockfileScratchpad,
+} from './buz/validation.buzz'
