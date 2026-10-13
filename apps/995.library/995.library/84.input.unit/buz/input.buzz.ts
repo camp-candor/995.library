@@ -19,9 +19,16 @@ export const openInput = (cpy: InputModel, bal: InputBit, ste: State) => {
     const blessed = terminal?.blessed
     const screen = terminal?.screen
 
+    // Headless fallback for automated test gauntlets and CI runners
     if (!screen || !blessed) {
         if (bal?.slv != null) {
-            bal.slv({ putBit: { idx: 'open-input-headless', src: bal?.src || '' } })
+            bal.slv({
+                putBit: {
+                    idx: 'open-input-headless',
+                    src: bal?.src || '',
+                    val: 0,
+                },
+            })
         }
         return cpy
     }
@@ -45,14 +52,17 @@ export const openInput = (cpy: InputModel, bal: InputBit, ste: State) => {
     const title = blessed.textbox({
         parent: screen,
         name: 'input-title',
-        keys: true,
+        keys: false,
         left: net.left,
-        top: 1,
+        top: typeof net.top === 'number' ? net.top : 1,
         width: net.width,
         height: 2,
-        content: 'rename',
+        content: labelText,
         border: { type: 'line' },
-        label: labelText,
+        style: {
+            fg: dat.clr0,
+            border: { fg: dat.clr0 },
+        },
     })
 
     const input = blessed.textbox({
@@ -60,31 +70,66 @@ export const openInput = (cpy: InputModel, bal: InputBit, ste: State) => {
         name: 'input-body',
         input: true,
         keys: true,
+        mouse: true,
         left: net.left,
-        top: net.top,
+        top: typeof net.top === 'number' ? net.top + 2 : 3,
         width: net.width,
-        height: net.height,
+        height: typeof net.height === 'number' ? Math.max(1, net.height - 2) : 1,
         inputOnFocus: true,
         style: {
             bg: dat.clr1,
-            focus: { bg: 'red' },
-            hover: { bg: 'red' },
+            fg: Color.BLACK,
+            focus: { bg: Color.YELLOW, fg: Color.BLACK },
+            hover: { bg: Color.YELLOW, fg: Color.BLACK },
         },
     })
 
-    input.focus()
+    let cleanedUp = false
+    const cleanup = () => {
+        if (cleanedUp) return
+        cleanedUp = true
 
-    input.on('submit', (src: string) => {
         try {
+            input.unkey(['escape'], handleCancel)
             title.destroy()
             input.destroy()
             screen.render()
         } catch {
             // Teardown defensive catch
         }
-        if (bal?.slv != null) bal.slv({ putBit: { idx: 'open-input', src } })
+    }
+
+    const handleCancel = () => {
+        cleanup()
+        if (bal?.slv != null) {
+            bal.slv({
+                putBit: {
+                    idx: 'open-input-cancel',
+                    src: '',
+                    val: -1,
+                },
+            })
+        }
+    }
+
+    input.key(['escape'], handleCancel)
+
+    input.on('submit', (src: string) => {
+        const valStr = src || ''
+        cleanup()
+        if (bal?.slv != null) {
+            bal.slv({
+                putBit: {
+                    idx: 'open-input',
+                    src: valStr,
+                    val: 0,
+                },
+            })
+        }
     })
 
+    input.focus()
     screen.render()
+
     return cpy
 }
