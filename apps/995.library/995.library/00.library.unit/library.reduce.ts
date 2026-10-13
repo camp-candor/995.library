@@ -49,6 +49,10 @@ export function reducer(
         case Act.PURGE_LOCKFILE_SCRATCHPAD:
             return Buzz.purgeLockfileScratchpad(clone(model, true), act.bale, state)
 
+
+        case Act.VALIDATE_LOCKFILE_SCRATCHPAD:
+            return Buzz.validateLockfileScratchpad(clone(model, true), act.bale, state)
+
         default:
             return model
     }
