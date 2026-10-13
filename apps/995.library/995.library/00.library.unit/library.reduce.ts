@@ -40,6 +40,9 @@ export function reducer(
         case Act.AUDIT_LIBRARY:
             return Buzz.auditLibrary(clone(model, true), act.bale, state)
 
+        case Act.BUMP_FLEET_VERSION:
+            return Buzz.bumpFleetVersion(clone(model, true), act.bale, state)
+
         case Act.CHECK_GIT_WORKING_TREE:
             return Buzz.checkGitWorkingTree(act.bale.src || process.cwd()).then(() => clone(model, true))
 
