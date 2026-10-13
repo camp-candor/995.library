@@ -1,6 +1,12 @@
 import type { Action } from '../99.core/interface/action.interface'
 import type LibraryBit from './fce/library.bit'
 
+export const OPEN_HUMAN_SAVE_GATE = '[Gate action] Open Human Save Gate'
+export class OpenHumanSaveGate implements Action<LibraryBit> {
+    readonly type = OPEN_HUMAN_SAVE_GATE
+    constructor(public bale: LibraryBit) {}
+}
+
 export const INIT_LIBRARY = '[Library action] Init Library'
 export class InitLibrary implements Action<LibraryBit> {
     readonly type = INIT_LIBRARY
@@ -125,6 +131,7 @@ export type Actions =
     | LaunchLibrary
     | FlatLibrary
     | AuditLibrary
+    | OpenHumanSaveGate
     | StageLockfileConflict
     | PurgeLockfileScratchpad
     | ValidateLockfileScratchpad
