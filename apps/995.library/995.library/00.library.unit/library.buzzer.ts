@@ -42,3 +42,5 @@ export {
     promoteLockfileScratchpad,
     mintLockfileLedger,
 } from './buz/promotion.buzz'
+
+export { openHumanSaveGate } from './buz/human-save-gate.buzz';
