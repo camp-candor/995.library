@@ -18,3 +18,4 @@ export { rollbackSagaJournal } from './buz/library.buzz';
 export { finalizeSagaJournal } from './buz/library.buzz';
 export { auditLibrary } from './buz/library.buzz';
 export { resolveRepoRoot } from './buz/library.buzz';
+export { analyzeManifestDivergence, synthesizeConflictScratchpad, stageLockfileConflict, purgeLockfileScratchpad } from './buz/lockfile.buzz'
