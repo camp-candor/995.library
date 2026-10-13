@@ -66,6 +66,10 @@ export function reducer(
         case Act.MINT_LOCKFILE_LEDGER:
             return Buzz.mintLockfileLedger(clone(model, true), act.bale, state)
 
+
+        case Act.OPEN_HUMAN_SAVE_GATE:
+            return Buzz.openHumanSaveGate(clone(model, true), act.bale as any, state)
+
         default:
             return model
     }

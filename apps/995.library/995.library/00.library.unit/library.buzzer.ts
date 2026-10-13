@@ -1,3 +1,4 @@
+export { openHumanSaveGate } from './buz/human-save-gate.buzz';
 export { initLibrary } from './buz/library.buzz';
 export { updateLibrary } from './buz/library.buzz';
 export { listLibrary } from './buz/library.buzz';
