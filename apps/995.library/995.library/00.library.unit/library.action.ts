@@ -67,6 +67,19 @@ export class AuditLibrary implements Action<LibraryBit> {
     constructor(public bale: LibraryBit) {}
 }
 
+
+export const STAGE_LOCKFILE_CONFLICT = '[Lockfile action] Stage Lockfile Conflict'
+export class StageLockfileConflict implements Action<LibraryBit> {
+    readonly type = STAGE_LOCKFILE_CONFLICT
+    constructor(public bale: LibraryBit) {}
+}
+
+export const PURGE_LOCKFILE_SCRATCHPAD = '[Lockfile action] Purge Lockfile Scratchpad'
+export class PurgeLockfileScratchpad implements Action<LibraryBit> {
+    readonly type = PURGE_LOCKFILE_SCRATCHPAD
+    constructor(public bale: LibraryBit) {}
+}
+
 export type Actions =
     | CheckGitWorkingTree
     | ProgressLibrarySaga
@@ -79,4 +92,5 @@ export type Actions =
     | LaunchLibrary
     | FlatLibrary
     | AuditLibrary
-
+    | StageLockfileConflict
+    | PurgeLockfileScratchpad
