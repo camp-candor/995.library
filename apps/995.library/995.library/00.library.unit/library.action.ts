@@ -85,6 +85,13 @@ export class ValidateLockfileScratchpad implements Action<LibraryBit> {
     constructor(public bale: LibraryBit) {}
 }
 
+
+export const RESOLVE_LOCKFILE_HUMAN_GATE = '[Lockfile action] Resolve Lockfile Human Gate'
+export class ResolveLockfileHumanGate implements Action<LibraryBit> {
+    readonly type = RESOLVE_LOCKFILE_HUMAN_GATE
+    constructor(public bale: LibraryBit) {}
+}
+
 export type Actions =
     | CheckGitWorkingTree
     | ProgressLibrarySaga
@@ -100,3 +107,4 @@ export type Actions =
     | StageLockfileConflict
     | PurgeLockfileScratchpad
     | ValidateLockfileScratchpad
+    | ResolveLockfileHumanGate
