@@ -43,6 +43,13 @@ export function reducer(
         case Act.CHECK_GIT_WORKING_TREE:
             return Buzz.checkGitWorkingTree(act.bale.src || process.cwd()).then(() => clone(model, true))
 
+
+        case Act.STAGE_LOCKFILE_CONFLICT:
+            return Buzz.stageLockfileConflict(clone(model, true), act.bale, state)
+
+        case Act.PURGE_LOCKFILE_SCRATCHPAD:
+            return Buzz.purgeLockfileScratchpad(clone(model, true), act.bale, state)
+
         default:
             return model
     }
