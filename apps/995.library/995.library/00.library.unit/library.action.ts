@@ -112,6 +112,13 @@ export class BumpFleetVersion implements Action<LibraryBit> {
     constructor(public bale: LibraryBit) {}
 }
 
+
+export const OPEN_HUMAN_SAVE_GATE = '[Gate action] Open Human Save Gate'
+export class OpenHumanSaveGate implements Action<LibraryBit> {
+    readonly type = OPEN_HUMAN_SAVE_GATE
+    constructor(public bale: LibraryBit) {}
+}
+
 export type Actions =
 
     | CheckGitWorkingTree
@@ -132,3 +139,4 @@ export type Actions =
     | PromoteLockfileScratchpad
     | MintLockfileLedger
     | BumpFleetVersion
+    | OpenHumanSaveGate
