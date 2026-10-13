@@ -56,6 +56,13 @@ export function reducer(
         case Act.RESOLVE_LOCKFILE_HUMAN_GATE:
             return Buzz.resolveLockfileHumanGate(clone(model, true), act.bale, state)
 
+
+        case Act.PROMOTE_LOCKFILE_SCRATCHPAD:
+            return Buzz.promoteLockfileScratchpad(clone(model, true), act.bale, state)
+
+        case Act.MINT_LOCKFILE_LEDGER:
+            return Buzz.mintLockfileLedger(clone(model, true), act.bale, state)
+
         default:
             return model
     }
