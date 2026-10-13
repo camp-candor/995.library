@@ -33,3 +33,11 @@ export {
     emitDossierTelemetry,
     resolveLockfileHumanGate,
 } from './buz/circuit-breaker.buzz'
+
+export {
+    computeCanonicalManifestHash,
+    readLastLedgerEntry,
+    mintLockfileLedgerEntry,
+    promoteLockfileScratchpad,
+    mintLockfileLedger,
+} from './buz/promotion.buzz'
