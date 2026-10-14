@@ -70,7 +70,7 @@ export class ProgressLibrarySaga implements Action<LibraryBit> {
 export const AUDIT_LIBRARY = '[Audit action] Audit Library'
 export class AuditLibrary implements Action<LibraryBit> {
     readonly type = AUDIT_LIBRARY
-    constructor(public bale: LibraryBit) {}
+    constructor(public bale?: LibraryBit) {}
 }
 
 export const STAGE_LOCKFILE_CONFLICT = '[Library action] Stage Lockfile Conflict'
@@ -118,8 +118,19 @@ export class BumpFleetVersion implements Action<LibraryBit> {
     constructor(public bale: LibraryBit) {}
 }
 
-export type Actions =
+export const CHECK_SOVEREIGNTY = '[Sovereignty action] Check Sovereignty'
+export class CheckSovereignty implements Action<LibraryBit> {
+    readonly type = CHECK_SOVEREIGNTY
+    constructor(public bale: LibraryBit) {}
+}
 
+export const REWIRE_LIBRARY = '[Rewire action] Rewire Library'
+export class RewireLibrary implements Action<LibraryBit> {
+    readonly type = REWIRE_LIBRARY
+    constructor(public bale: LibraryBit) {}
+}
+
+export type Actions =
     | CheckGitWorkingTree
     | ProgressLibrarySaga
     | InitLibrary
@@ -139,3 +150,6 @@ export type Actions =
     | PromoteLockfileScratchpad
     | MintLockfileLedger
     | BumpFleetVersion
+    | CheckSovereignty
+    | RewireLibrary
+
