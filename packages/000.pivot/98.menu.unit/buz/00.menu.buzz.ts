@@ -54,6 +54,14 @@ export const initMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         idx: 'cns00',
         src: '-----------',
     })
+    bit = await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+        idx: 'cns00',
+        src: '>> [READY] Pivot Control Plane Active',
+    })
+    bit = await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+        idx: 'cns00',
+        src: ':: [KEYS] UP/DOWN or J/K: Navigate | ENTER: Select | ESC: Back',
+    })
 
     await updateMenu(cpy, bal, ste)
 
@@ -75,7 +83,16 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ySpan: 8,
     })
     bit = await global.LIBRARY.hunt(OPEN_CHOICE, {
-        dat: { clr0: Color.BLACK, clr1: Color.YELLOW },
+        dat: {
+            clr0: Color.BLACK,
+            clr1: Color.YELLOW,
+            cb: (item: string) => {
+                global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> Focus: [${item}] - Press ENTER to execute`,
+                })
+            },
+        },
         src: Align.VERTICAL,
         lst,
         net: bit.grdBit.dat,
