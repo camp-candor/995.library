@@ -16,6 +16,7 @@
         "//__ DEV & RUNNER _________________________": "",
         "dev": "npm run dev --workspace=@camp_candor/995.library",
         "tui": "npx tsx apps/995.library/run.ts -t pivot",
+        "tui:cauldron": "npx tsx apps/995.library/run.ts -t cauldron",
         "//__ BUILD & TYPES ________________________": "",
         "build": "npm run build --workspaces --if-present",
         "check:types": "tsc -b",
