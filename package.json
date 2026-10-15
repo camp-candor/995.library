@@ -44,7 +44,8 @@
         "clean:dist": "find . -name 'dist' -type d -prune -exec rm -rf '{}' +",
         "clean:ts": "find . -name '*.tsbuildinfo' -type f -delete",
         "clean:js": "find packages/100.agent -name '*.js' -o -name '*.d.ts' -delete",
-        "reset": "npm run clean && rm -rf node_modules package-lock.json && npm install && npm run build"
+        "reset": "npm run clean && rm -rf node_modules package-lock.json && npm install && npm run build",
+        "prepare": "node -e \"try { require('child_process').execSync('git config core.hooksPath .husky/_'); } catch {}\""
     },
     "lint-staged": {
         "*.{js,ts,tsx,json,css,md}": [
