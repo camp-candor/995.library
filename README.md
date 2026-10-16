@@ -1,7 +1,17 @@
-# npm-agent-01
+# 995.library
 
-> Deterministic Edge DevOps Control Plane & Autonomous Agent Boilerplate. Built
-> on Cloudflare Workers, Durable Objects, TypeBox, and Blessed TUI.
+> Master storehouse and Blessed terminal cockpit for the fleet. Local-first,
+> deterministic, zero-config: domain pivots mount dynamically, no cloud
+> deployment, no workers.
+
+`995.library` operates under a dual mandate (see [AGENTS.md](./AGENTS.md)):
+
+1. **Definitive point of origin** -- all reusable units (`*.unit`), action
+   bales, buzzers, and Redux-pattern state machines across the fleet originate,
+   evolve, and are verified in this repository.
+2. **Autonomous terminal cockpit** -- a deterministic Blessed terminal UI
+   harness backed by an `rx-lite` state machine, mounting local domain pivots
+   dynamically without compile-time coupling.
 
 ---
 
@@ -9,25 +19,43 @@
 
 ```text
 .
-├── apps/
-│   ├── worker/              # Cloudflare Worker Edge Control Plane (@camp_candor/agent)
-│   │   ├── src/index.ts     # Hono router + AgentSessionDO + edge endpoints
-│   │   ├── src/tools.core.ts# Deterministic Git & DevOps tools (S_clean anchor)
-│   │   ├── src/tools.custom.ts # Sovereign tool extension boundary (merge=ours)
-│   │   ├── src/redaction.ts # In-flight secret redaction firewall
-│   │   ├── src/rollbackEngine.ts # 4-Stage compensating saga rollback engine
-│   │   └── test/            # Vitest worker pool and E2E audit suites
-│   └── 995.library/         # Blessed Terminal UI Harness (@camp_candor/995.library)
-│       ├── run.ts           # Dynamic package loader & CLI entrypoint
-│       └── 995.library/     # [IMMUTABLE] Core Blessed Curses engine
-│
-└── packages/
-    └── 100.agent/           # Core Agent Domain & Terminal Cockpit
-        ├── BEE.ts           # Unit registration & state manifest
-        ├── src/cascade.ts   # 4-tier endpoint resolution cascade & WS derivation
-        ├── 00.agent.unit/   # Agent core actions, reducers, WS connections
-        └── 98.menu.unit/    # Blessed Menu Screen, Local/Live Switchboard
+|-- apps/
+|   `-- 995.library/            # Blessed TUI harness (@camp_candor/995.library)
+|       |-- run.ts              # Schema-driven dynamic runner & bus injector
+|       |-- data/redux/BEE.txt  # Redux wiring manifest template
+|       |-- test/               # AVA test suites
+|       `-- 995.library/        # Core curses engine & built-in units
+|           |-- BEE.ts / hunt.ts
+|           |-- 00.library.unit/# Workspace template compiler (updateLibrary)
+|           |-- 01.unit.unit/   # Deterministic unit scaffolding engine
+|           |-- 80.terminal.unit/, 81.grid.unit/
+|           |-- 83.console.unit/# Console log viewport (cns00)
+|           |-- 84.input.unit/, 85.choice.unit/
+|           `-- 98.menu.unit/   # Master terminal navigation loop
+|
+|-- packages/                   # Canonical storehouse for fleet domain pivots
+|   |-- 000.pivot/              # Base pivot template
+|   |-- 001.cauldron/
+|   |-- 002.lore/
+|   |-- 100.agent/              # Core Agent Domain & Cockpit
+|   |-- 103.factory/
+|   |-- 104.hotkey/
+|   |-- 105.gemini/
+|   |-- 132.github/             # GitHub control plane pivot
+|   |-- 133.cloudflare/         # Cloudflare domain pivot
+|   |-- 135.jules/
+|   |-- 202.dashboard/
+|   |-- 821.repobot/
+|   `-- 924.slack/              # Slack operations bridge
+|
+`-- data/                       # Transcripts, directives, runtime artifacts
 ```
+
+Each package is a self-contained workspace (`BEE.ts` manifest, `hunt.ts`
+bootstrap, `*.unit/` modules) that can be copied 1:1 into any downstream
+monorepo. `run.ts` discovers them by sweeping `packages/*` for a valid
+`tsconfig.json` plus `terminal` metadata in `package.json` -- no hardcoded
+registry.
 
 ---
 
@@ -35,8 +63,10 @@
 
 - **Node.js:** `>= 20.0.0`
 - **npm:** `>= 10.0.0`
-- **Cloudflare Account:** With Workers, Durable Objects, and Workers AI enabled
-- **GitHub PAT:** With `repo` and `workflow` scopes
+
+No cloud account, worker runtime, or deploy target is required. This repository
+is local-first: the cockpit, compilers, and test batteries all run on your
+workstation.
 
 ---
 
@@ -45,53 +75,83 @@
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/your-org/npm-agent-01.git
-cd npm-agent-01
+git clone https://github.com/camp-candor/995.library.git
+cd 995.library
 npm ci
 ```
 
-### 2. Configure Environment
+### 2. Configure Environment (optional)
 
 ```bash
-# Root environment (used by packages/100.agent and CI scripts)
 cp .env.example .env
-
-# Worker environment (used by local wrangler dev)
-cp apps/worker/.dev.vars.example apps/worker/.dev.vars
 ```
 
-Fill in `GITHUB_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`, and `CLOUDFLARE_API_TOKEN`.
+Only needed when exercising pivot integrations (GitHub, Slack, Cloudflare API
+clients inside `packages/`). The TUI and test suites run without it.
 
-### 3. Verify Quality Gates
+### 3. Launch the Cockpit
 
 ```bash
-# Verify static compilation across all project references
+# Blessed curses cockpit (dynamic pivot autodiscovery)
+npm run tui
+
+# Focused entry points
+npm run tui:pivot
+npm run tui:cauldron
+```
+
+### 4. Verify Quality Gates
+
+```bash
+# Static compilation across all project references
 npm run check:types
 
-# Run the full monorepo sequential test battery
+# Full monorepo test battery (Vitest + AVA)
 npm test
 
-# Verify code formatting and linting
+# Unified gate: boundary + sentry + artifacts + types + format + lint
 npm run check:all
-```
-
-### 4. Run the Local Control Plane
-
-```bash
-# Terminal 1: Boot the edge worker locally on port 8787
-npm run worker:dev
-
-# Terminal 2: Launch the Blessed curses cockpit
-npm run tui
 ```
 
 ---
 
-## Adding Custom Tools
+## Key Scripts
 
-Downstream tools must be added to `apps/worker/src/tools.custom.ts`. This file
-is protected by `.gitattributes` (`merge=ours`), ensuring upstream template
-updates will never overwrite your proprietary tools.
+| Script                | Purpose                                     |
+| --------------------- | ------------------------------------------- |
+| `npm run tui`         | Launch Blessed cockpit via dynamic `run.ts` |
+| `npm run build`       | Build all workspaces                        |
+| `npm run check:types` | Project-wide typecheck (`tsc -b`)           |
+| `npm run test`        | Agent (Vitest) + library (AVA) suites       |
+| `npm run check:all`   | Unified verification gate                   |
+| `npm run gauntlet`    | `check:all` + full test battery             |
+| `npm run fix`         | Auto-format (Prettier) + auto-fix (ESLint)  |
 
-All custom tool parameter schemas must enforce TypeBox
-`{ additionalProperties: false }`.
+---
+
+## CI Parity
+
+Pushes to `main` run the Main CI gauntlet (`.github/workflows/push-main.yml`):
+
+1. `npm ci` -- clean install from the committed lockfile
+2. `npm run check:types` -- verify types across project references
+3. `npm test` -- full monorepo test battery
+4. Immutable harness boundary assertion
+
+There are no deploy workflows in this repository. Keep `package-lock.json`
+committed and in sync (`npm install` after any workspace change) so `npm ci`
+stays green.
+
+---
+
+## Working Here
+
+- Read [AGENTS.md](./AGENTS.md) first -- it defines the architectural laws:
+  7-bit pure ASCII telemetry, no `console.log` after curses init (route to
+  `cns00` via `UPDATE_CONSOLE`), fail-closed buzzers, and the verification
+  gauntlet.
+- New modules scaffold as `packages/<domain>/<index>.<name>.unit/` following the
+  deterministic `01.unit.unit` stubs (no `setTimeout`, no `debugger`
+  placeholders).
+- The `UPDATE_LIBRARY` compiler regenerates `BEE.ts` manifests in-process from a
+  lexical unit sweep -- see `AGENTS.md` section 3.
