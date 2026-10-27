@@ -1,0 +1,18 @@
+{
+    "extends": "../../apps/995.library/tsconfig-base.json",
+    "compilerOptions": {
+        "outDir": "../dist/003.time",
+        "rootDir": ".",
+        "composite": true,
+        "skipLibCheck": true,
+        "noImplicitAny": false,
+        "strictNullChecks": false,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false,
+        "esModuleInterop": true,
+        "allowSyntheticDefaultImports": true,
+        "jsx": "react-jsx"
+    },
+    "include": ["**/*"],
+    "exclude": ["**/node_modules"]
+}
