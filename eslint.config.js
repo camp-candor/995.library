@@ -15,6 +15,9 @@ export default tseslint.config(
             '**/node_modules/**',
             '**/*.d.ts',
             '**/apps/995.library/**',
+            // React dashboard (ported from 002.react-control upstream).
+            // Keeps upstream style; validated by dashboard CI (build + vitest + playwright).
+            '**/apps/dashboard/**',
         ],
     },
 

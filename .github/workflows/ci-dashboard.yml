@@ -1,0 +1,86 @@
+name: Dashboard CI
+
+# Ported from 002.react-control/.github/workflows/ci.yml and adapted to the
+# 995.library monorepo layout (app lives at apps/dashboard).
+# Validates the React dashboard: shared type builds, production bundle,
+# unit tests (vitest) and E2E tests (playwright-core + system Chrome).
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - 'apps/dashboard/**'
+            - 'packages/shared/**'
+            - 'packages/types/**'
+            - 'packages/100.shade/**'
+            - '.github/workflows/ci-dashboard.yml'
+    pull_request:
+        paths:
+            - 'apps/dashboard/**'
+            - 'packages/shared/**'
+            - 'packages/types/**'
+            - 'packages/100.shade/**'
+            - '.github/workflows/ci-dashboard.yml'
+    workflow_dispatch:
+
+concurrency:
+    group: ci-dashboard-${{ github.ref }}
+    cancel-in-progress: true
+
+permissions:
+    contents: read
+
+env:
+    HUSKY: 0
+
+jobs:
+    validate:
+        runs-on: ubuntu-latest # Contains Google Chrome pre-installed
+        steps:
+            - uses: actions/checkout@v6
+              with:
+                  fetch-depth: 0
+
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+                  cache: 'npm'
+
+            # CRITICAL: Protoc must be installed before the types build
+            # so shared protobuf types generate correctly.
+            - name: Install Protoc
+              uses: arduino/setup-protoc@v3
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+
+            # Install (includes playwright-core, skips browser binaries)
+            - name: Install Dependencies
+              run: npm ci
+
+            # Shared packages must emit dist/ before the bundler resolves them.
+            - name: Build Shared Packages
+              run: npm run build --workspace=@camp_candor/shared --workspace=@camp_candor/types
+
+            # Production bundle (RSBuild). Reads PUBLIC_WS_URL from
+            # apps/dashboard/.env when no env override is provided.
+            - name: Build Dashboard
+              run: npm run build --workspace=@camp_candor/dashboard
+
+            # Unit tests (vitest, jsdom)
+            - name: Run Unit Tests
+              run: npm run test:unit --workspace=@camp_candor/dashboard
+
+            # E2E tests (Playwright Core with system Chrome).
+            # Auto-starts the RSBuild dev server.
+            - name: Run E2E Tests
+              run: npm run test:e2e --workspace=@camp_candor/dashboard
+              env:
+                  CI: true
+
+            - name: Upload Playwright Report
+              if: failure()
+              uses: actions/upload-artifact@v6
+              with:
+                  name: playwright-report
+                  path: apps/dashboard/playwright-report/
+                  retention-days: 7

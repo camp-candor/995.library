@@ -32,3 +32,10 @@ temp/
 tmp/
 packages/132.github/
 packages/135.jules/
+
+# React dashboard + shared type packages (ported from 002.react-control upstream).
+# Kept in upstream formatting (2-space, semicolons); validated by dashboard CI workflows.
+apps/dashboard/
+packages/shared/
+packages/types/
+packages/100.shade/

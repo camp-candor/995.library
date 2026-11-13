@@ -42,29 +42,34 @@
      (`ActCns.UPDATE_CONSOLE`).
    - All buzzers must guard `ste.hunt` / `global.LIBRARY` calls so headless unit
      tests resolve cleanly without a mounted TTY screen.
-   - **BLESSED 12x12 COCKPIT DUAL-PANE TOPOLOGY INVARIANT:** The 12-column terminal
-     grid allocation is immutable. The **left 4 columns**
+   - **BLESSED 12x12 COCKPIT DUAL-PANE TOPOLOGY INVARIANT:** The 12-column
+     terminal grid allocation is immutable. The **left 4 columns**
      (`{ x: 0, y: 4, xSpan: 4, ySpan: 8 }`) must house the 6 interactive choices
      bound with explicit grid net data (`net: gridChoice?.grdBit?.dat`), and the
      **right 8 columns** (`{ x: 4, y: 0, xSpan: 8, ySpan: 12 }`) must mount the
-     information pane via `[Write action] Write Console` (`cns00`) streaming live
-     telemetry and focus tooltips. The Coding Agent is **STRICTLY FORBIDDEN** from
-     collapsing this dual-pane layout, removing the `cns00` information pane,
-     omitting `WRITE_CONSOLE`, omitting choice `net` mesh binding, or reverting to
-     generic placeholder menus.
-   - **Blessed 12x12 Cockpit Dual-Pane Layout Standard:**
-     Every package flight deck mounted into the Blessed alternate screen buffer
-     (`apps/995.library`) must maintain the dual-pane topology:
-     1. **Left Control Pane (Columns 0-4 / 33% width, Rows 4-12):** Houses exactly the
-        6 interactive domain choices, rendered via `[Open action] Open Choice` with
-        mandatory `net: gridChoice?.grdBit?.dat` binding. Never omit `net` mesh anchoring
-        (doing so causes choice rendering to blow out to 100% full-screen width, obliterating the layout).
-     2. **Right Information & Telemetry Pane (Columns 4-12 / 67% width, Rows 0-12):**
-        Must mount `cns00` via `[Grid action] Update Grid` `{ x: 4, y: 0, xSpan: 8, ySpan: 12 }`
-        AND `[Write action] Write Console` `{ idx: 'cns00', dat: { net: gridConsole?.grdBit?.dat, src: 'alligator0' } }`.
-        All telemetry, boot banners, and live item-focus descriptions stream exclusively into `cns00`.
-     3. **Coding Agent Prohibition:** The Coding Agent is **NEVER** to alter, collapse, or remove
-        this dual-pane layout, omit `WRITE_CONSOLE`, or strip the information panel from the TUI.
+     information pane via `[Write action] Write Console` (`cns00`) streaming
+     live telemetry and focus tooltips. The Coding Agent is **STRICTLY
+     FORBIDDEN** from collapsing this dual-pane layout, removing the `cns00`
+     information pane, omitting `WRITE_CONSOLE`, omitting choice `net` mesh
+     binding, or reverting to generic placeholder menus.
+   - **Blessed 12x12 Cockpit Dual-Pane Layout Standard:** Every package flight
+     deck mounted into the Blessed alternate screen buffer (`apps/995.library`)
+     must maintain the dual-pane topology:
+     1. **Left Control Pane (Columns 0-4 / 33% width, Rows 4-12):** Houses
+        exactly the 6 interactive domain choices, rendered via
+        `[Open action] Open Choice` with mandatory
+        `net: gridChoice?.grdBit?.dat` binding. Never omit `net` mesh anchoring
+        (doing so causes choice rendering to blow out to 100% full-screen width,
+        obliterating the layout).
+     2. **Right Information & Telemetry Pane (Columns 4-12 / 67% width, Rows
+        0-12):** Must mount `cns00` via `[Grid action] Update Grid`
+        `{ x: 4, y: 0, xSpan: 8, ySpan: 12 }` AND `[Write action] Write Console`
+        `{ idx: 'cns00', dat: { net: gridConsole?.grdBit?.dat, src: 'alligator0' } }`.
+        All telemetry, boot banners, and live item-focus descriptions stream
+        exclusively into `cns00`.
+     3. **Coding Agent Prohibition:** The Coding Agent is **NEVER** to alter,
+        collapse, or remove this dual-pane layout, omit `WRITE_CONSOLE`, or
+        strip the information panel from the TUI.
 5. **Gauntlet Type & Reducer Hardening (`test/gauntlet.verification.test.ts`):**
    - **Typed Bit Callbacks (Tier 1):** In every `fce/*.bit.ts` interface,
      `slv?: Function` is forbidden. Declare strongly typed resolver callbacks:
@@ -98,15 +103,14 @@
 
 ## 2. File & Workspace Boundaries
 
-| Path / Scope                                             | Access Level            | Enforcement Gate          | Operational Rule                                                                                                                    |
-| :------------------------------------------------------- | :---------------------- | :------------------------ | :---------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/995.library/995.library/**`                        | **MUTABLE (Sovereign)** | `npm run test:library`    | Core Blessed harness and built-in units (`00.library.unit` .. `99.bus.unit`). Must pass `gauntlet.verification.test.ts`.            |
-| `apps/995.library/run.ts`                                | **MUTABLE**             | `run.discovery.test.ts`   | Schema-driven dynamic package runner. Hardcoded package registries (`PACKAGES_CONFIG`) are forbidden.                               |
-| `apps/995.library/test/*.test.ts`                        | **MUTABLE (AVA)**       | `npm run test:library`    | Executed sequentially via AVA (`concurrency: 1`, `--import=tsx`). Do NOT use Vitest APIs here.                                      |
-| `packages/100.agent/**`                                  | **SOURCE-ONLY (.ts)**   | `npm run check:artifacts` | Executed via Vitest (`npm run test:agent`). Zero leaked `.js` or `.d.ts` files allowed outside `dist/`.                             |
-| `packages/<NNN>.<domain>/**`                             | **MUTABLE (Pivots)**    | `npm run check:types`     | Canonical fleet domain pivots. Never collapse into `apps/995.library/`.                                                             |
-| `data/overview/**`, `data/build/**`, `data/directive/**` | **APPEND-ONLY**         | Audit Review              | Historical ledger. Never delete or rewrite prior specs; only update designated `- **Progress:**` headers or add new numbered files. |
-| External Sibling Repos (`D:\trellis\*`)                  | **OFF-LIMITS**          | Sovereignty Interlock     | Never mutate sibling repositories on disk during local unit tests or unapproved broadcast runs.                                     |
+| Path / Scope                                             | Access Level            | Enforcement Gate        | Operational Rule                                                                                                                    |
+| :------------------------------------------------------- | :---------------------- | :---------------------- | :---------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/995.library/995.library/**`                        | **MUTABLE (Sovereign)** | `npm run test:library`  | Core Blessed harness and built-in units (`00.library.unit` .. `99.bus.unit`). Must pass `gauntlet.verification.test.ts`.            |
+| `apps/995.library/run.ts`                                | **MUTABLE**             | `run.discovery.test.ts` | Schema-driven dynamic package runner. Hardcoded package registries (`PACKAGES_CONFIG`) are forbidden.                               |
+| `apps/995.library/test/*.test.ts`                        | **MUTABLE (AVA)**       | `npm run test:library`  | Executed sequentially via AVA (`concurrency: 1`, `--import=tsx`). Do NOT use Vitest APIs here.                                      |
+| `packages/<NNN>.<domain>/**`                             | **MUTABLE (Pivots)**    | `npm run check:types`   | Canonical fleet domain pivots. Never collapse into `apps/995.library/`.                                                             |
+| `data/overview/**`, `data/build/**`, `data/directive/**` | **APPEND-ONLY**         | Audit Review            | Historical ledger. Never delete or rewrite prior specs; only update designated `- **Progress:**` headers or add new numbered files. |
+| External Sibling Repos (`D:\trellis\*`)                  | **OFF-LIMITS**          | Sovereignty Interlock   | Never mutate sibling repositories on disk during local unit tests or unapproved broadcast runs.                                     |
 
 ---
 
@@ -140,7 +144,6 @@
 |   |-- 000.pivot/                      # Pivot template package
 |   |-- 001.cauldron/                   # Cauldron orchestration package
 |   |-- 002.time/ & 003.space/          # Temporal & spatial hex/GeoJSON units
-|   |-- 100.agent/                      # Core Agent Domain & Cockpit (@camp_candor/100.agent)
 |   |-- 103.factory/ & 104.hotkey/      # Factory & hotkey units
 |   |-- 105.gemini/ & 135.jules/        # LLM & autonomous worker integration units
 |   |-- 132.github/ & 133.cloudflare/   # GitHub & Cloudflare control units
@@ -213,8 +216,7 @@ separation of duties:
 ### 6.1 Pre-Flight Hygiene Sequence (Run Before Any Mutation)
 
 ```bash
-# 1. Verify no leaked .js/.d.ts artifacts in packages/100.agent and zero UTF-8 emojis
-npm run check:artifacts
+# 1. Verify zero UTF-8 emojis
 npm run check:sentry
 ```
 
@@ -232,15 +234,12 @@ npm run gauntlet
    - `npm run check:boundary` -- Sovereign no-op (`exit 0`).
    - `npm run check:sentry` -- Scans `packages/`, `apps/995.library/run.ts`, and
      `.github/` for multi-byte UTF-8 emojis.
-   - `npm run check:artifacts` -- Verifies zero leaked `.js` or `.d.ts` files
-     inside `packages/100.agent`.
    - `npm run check:types` (`tsc -b`) -- Composite TypeScript compilation across
      all workspaces.
    - `npm run prettier:check` -- Formatting verification (auto-fix via
      `npm run fix`).
    - `npm run lint:check` -- ESLint verification across workspaces.
 2. `npm test`:
-   - `npm run test:agent` -- Runs Vitest suites in `@camp_candor/100.agent`.
    - `npm run test:library` -- Runs all AVA test suites in
      `@camp_candor/995.library` (`apps/995.library/test/**/*.test.ts`).
 
@@ -248,17 +247,16 @@ npm run gauntlet
 
 | Command                                                       | Purpose                                                                                                                  |
 | :------------------------------------------------------------ | :----------------------------------------------------------------------------------------------------------------------- |
-| `npm run dev` / `npm run tui`                                 | Launch interactive Blessed terminal cockpit via `npx tsx apps/995.library/run.ts`.                                       |
+| `npm run dev`                                                 | Launch React dashboard dev server (`rsbuild dev` in `apps/dashboard`).                                                   |
+| `npm run lib` / `npm run tui`                                 | Launch interactive Blessed terminal cockpit via `npx tsx apps/995.library/run.ts`.                                       |
 | `npm run tui:pivot`                                           | Launch Blessed terminal directly into `pivot` (`npx tsx apps/995.library/run.ts -t pivot`).                              |
 | `npm run tui:cauldron`                                        | Launch Blessed terminal directly into `cauldron` (`npx tsx apps/995.library/run.ts -t cauldron`).                        |
 | `npm run gauntlet`                                            | Run full verification gate (`npm run check:all && npm test`).                                                            |
-| `npm run check:all`                                           | Run `check:boundary && check:sentry && check:artifacts && check:types && prettier:check && lint:check`.                  |
+| `npm run check:all`                                           | Run `check:boundary && check:sentry && check:types && prettier:check && lint:check`.                                     |
 | `npm run test:library`                                        | Run AVA test suite in `apps/995.library`.                                                                                |
 | `npx ava apps/995.library/test/<file>.test.ts`                | Run a single targeted AVA test file from the monorepo root (or `npx ava test/<file>.test.ts` inside `apps/995.library`). |
 | `npm --workspace=@camp_candor/995.library run check:gauntlet` | Run `ava test/gauntlet.verification.test.ts` (certifies Bit contracts, Action generics, and Reducer cloning).            |
-| `npm run test:agent`                                          | Run Vitest suite in `packages/100.agent`.                                                                                |
 | `npm run fix`                                                 | Auto-format with Prettier and apply ESLint fixes (`prettier:fix && lint:fix`).                                           |
-| `npm run clean:js`                                            | Remove leaked `.js` and `.d.ts` artifacts from `packages/100.agent`.                                                     |
 
 ---
 
@@ -289,7 +287,7 @@ Commits and pushes are gated by `.husky/pre-commit`, `.husky/pre-push`, and
    diagnostics.
 2. **Test Runner Separation:** Never import `vitest` inside
    `apps/995.library/test/*.test.ts` (which uses `ava` + `sinon`), and never
-   import `ava` inside `packages/100.agent/test/*.test.ts` (which uses
+   import `ava` inside `apps/dashboard/test/**/*.test.{ts,tsx}` (which uses
    `vitest`).
 3. **Scratch & Env Cleanup in Tests:** Any test that mutates
    `process.env.FLEET_ROOT`, `process.env.WORK_DIR`, `require.cache`, or creates

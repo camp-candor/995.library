@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package game;
+
+// 1. THE ROOT ENVELOPE
+// The outer shell.
+message GamePacket {
+  oneof payload {
+    // 🔴 FIX: Renamed from 'client_action' to 'client' to match TS code
+    ClientPacket client = 1;
+    // 🔴 FIX: Renamed from 'server_update' to 'server' to match TS code
+    ServerPacket server = 2;
+  }
+}
+
+// 2. CLIENT PACKET
+// A container for things the client sends.
+message ClientPacket {
+  oneof type {
+    JoinRequest join = 1;
+    InputRequest input = 2;
+  }
+}
+
+message JoinRequest {
+  string session_token = 1; 
+  string char_id = 2;
+}
+
+message InputRequest {
+  int32 input_type = 1; 
+  int32 x = 2;
+  int32 y = 3;
+}
+
+// 3. SERVER PACKET
+// A container for things the server sends.
+message ServerPacket {
+  oneof type {
+    WelcomePacket welcome = 1;
+    StateUpdate update = 2;
+  }
+}
+
+message WelcomePacket {
+  string player_id = 1;
+  int32 current_hp = 2;
+}
+
+message StateUpdate {
+  double tick = 1; // 🔴 FIX: int32 -> double to hold Date.now()
+  int32 hp = 2;
+  int32 x = 3;
+  int32 y = 4;
+}

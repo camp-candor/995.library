@@ -70,7 +70,6 @@ try {
 const expectedWorkspaces = [
     { name: '@camp_candor/995.library', targetRel: 'apps/995.library' },
     { name: '@camp_candor/agent', targetRel: 'apps/worker' },
-    { name: '@camp_candor/100.agent', targetRel: 'packages/100.agent' },
 ]
 
 const nodeModulesDir = path.join(cwd, 'node_modules')

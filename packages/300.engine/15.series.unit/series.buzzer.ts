@@ -1,6 +1,0 @@
-export { initSeries } from './buz/series.buzz'
-export { updateSeries } from './buz/series.buzz'
-export { selectSeries } from './buz/series.buzz'
-export { resolveSeriesDbPath } from './buz/series.buzz'
-export { listAvailableSeries } from './buz/series.buzz'
-export { sanitizeSeriesSlug, buildSeriesDbPath } from './buz/series.buzz'

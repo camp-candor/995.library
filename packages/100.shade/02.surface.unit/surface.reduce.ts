@@ -1,0 +1,45 @@
+import clone from 'clone-deep';
+import * as Act from './surface.action.js';
+import { SurfaceModel } from './surface.model.js';
+import * as Buzz from './surface.buzzer.js';
+import State from '../99.core/state.js';
+
+export function reducer(model: SurfaceModel = new SurfaceModel(), act: Act.Actions, state?: State) {
+  switch (act.type) {
+    case Act.UPDATE_SURFACE:
+      return Buzz.updateSurface(clone(model), act.bale, state);
+
+    case Act.INIT_SURFACE:
+      return Buzz.initSurface(clone(model), act.bale, state);
+
+    case Act.READ_SURFACE:
+      return Buzz.readSurface(clone(model), act.bale, state);
+
+    case Act.WRITE_SURFACE:
+      return Buzz.writeSurface(clone(model), act.bale, state);
+
+    case Act.CREATE_SURFACE:
+      return Buzz.createSurface(clone(model), act.bale, state);
+
+    case Act.DIMENSION_SURFACE:
+      return Buzz.dimensionSurface(clone(model), act.bale, state);
+
+    case Act.DELETE_SURFACE:
+      return Buzz.deleteSurface(clone(model), act.bale, state);
+
+    case Act.REMOVE_SURFACE:
+      return Buzz.removeSurface(clone(model), act.bale, state);
+
+    case Act.EXTRACT_SURFACE:
+      return Buzz.extractSurface(clone(model), act.bale, state);
+
+    case Act.LIST_SURFACE:
+      return Buzz.listSurface(clone(model), act.bale, state);
+
+    case Act.TEST_SURFACE:
+      return Buzz.testSurface(clone(model), act.bale, state);
+
+    default:
+      return model;
+  }
+}

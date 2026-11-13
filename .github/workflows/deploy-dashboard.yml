@@ -1,0 +1,86 @@
+name: Deploy Dashboard to Cloudflare Pages
+
+# Ported from 002.react-control/.github/workflows/deploy-pages.yml and adapted
+# to the 995.library monorepo layout (app lives at apps/dashboard).
+# Publishes the React dashboard (static dist + Pages Functions) to Cloudflare.
+#
+# Required repository secrets:
+#   CLOUDFLARE_API_TOKEN  - Cloudflare API token with Pages write access
+#   CLOUDFLARE_ACCOUNT_ID - Cloudflare account ID
+#   PUBLIC_SERVER_URL     - public WebSocket URL baked into the bundle as
+#                           process.env.PUBLIC_WS_URL (kept under the original
+#                           secret name so existing configuration keeps working)
+#
+# The target Pages project must already exist in the Cloudflare dashboard.
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - 'apps/dashboard/**' # Trigger when frontend code changes
+            - 'packages/shared/**' # Trigger when shared types change
+            - 'packages/types/**' # Trigger when wire protocol changes
+            - 'packages/100.shade/**'
+            - '.github/workflows/deploy-dashboard.yml'
+    workflow_dispatch: # Allow manual trigger
+
+concurrency:
+    group: deploy-dashboard-${{ github.ref }}
+    cancel-in-progress: false
+
+permissions:
+    contents: read
+
+env:
+    HUSKY: 0
+
+jobs:
+    deploy-dashboard:
+        runs-on: ubuntu-latest
+        name: Build and Deploy
+        steps:
+            - uses: actions/checkout@v6
+
+            # INSTALL THE COMPILER.
+            # RSBuild needs .proto files to compile the TS code.
+            - name: Install Protoc
+              uses: arduino/setup-protoc@v3
+              with:
+                  github-token: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Setup Node
+              uses: actions/setup-node@v6
+              with:
+                  node-version: 22
+                  cache: 'npm'
+
+            - name: Install Dependencies
+              run: npm ci
+
+            # STEP 1: Build shared packages.
+            # The React app cannot compile if the type definitions are missing.
+            # NOTE: the types build regenerates protobuf output via protoc.
+            - name: Build Shared Packages
+              run: npm run build --workspace=@camp_candor/shared --workspace=@camp_candor/types
+
+            # STEP 2: Build the React app (RSBuild).
+            # Generates apps/dashboard/dist plus Pages Functions from
+            # apps/dashboard/functions.
+            - name: Build Dashboard
+              run: npm run build --workspace=@camp_candor/dashboard
+              env:
+                  PUBLIC_WS_URL: ${{ secrets.PUBLIC_SERVER_URL }}
+
+            # STEP 3: Upload to Cloudflare Pages.
+            # You MUST create the project in the Cloudflare dashboard first.
+            - name: Deploy to Cloudflare Pages
+              id: pages_deploy
+              uses: cloudflare/wrangler-action@v3
+              with:
+                  apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+                  gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+                  workingDirectory: 'apps/dashboard'
+                  # Upload dist to the Pages project (functions/ is picked up
+                  # automatically from the project root).
+                  command: pages deploy dist --project-name=002-primal-mama-mobile-control

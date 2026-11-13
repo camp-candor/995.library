@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    // 🟢 REACT SETTINGS
+    "jsx": "react-jsx",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+
+    // 🟢 BUNDLER SETTINGS (Overrides NodeNext from root)
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+
+    // Strictness
+    "strict": true
+  },
+  "types": ["@cloudflare/workers-types", "@cloudflare/vitest-pool-workers", "vitest/globals", "@testing-library/jest-dom"],
+  "include": [
+    "src",
+    "test", // 🟢 Include tests
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "rsbuild.config.ts"
+  ],
+  "references": [{ "path": "../../packages/shared" }, { "path": "../../packages/types" }]
+}

@@ -37,7 +37,6 @@
 |   |-- 000.pivot/              # Base pivot template
 |   |-- 001.cauldron/
 |   |-- 002.lore/
-|   |-- 100.agent/              # Core Agent Domain & Cockpit
 |   |-- 103.factory/
 |   |-- 104.hotkey/
 |   |-- 105.gemini/

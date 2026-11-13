@@ -54,7 +54,6 @@ Thumbs.db
 
 # Package Source code exceptions
 !packages/*/src/types/
-!packages/100.agent/
 
 # Scratch & Temporary Testing Folders
 scratch/

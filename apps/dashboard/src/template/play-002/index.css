@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  --color-paper: #e9e5d9;
+  --color-surface: #f4f1ea;
+  --color-ink: #111111;
+  --color-ink-light: #333333;
+  --color-danger: #b3261e;
+  --color-warning: #d97706;
+  --color-dark-orange: #c2410c;
+
+  --spacing-gutter: 24px;
+
+  --font-sans: 'IBM Plex Sans', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+}
+
+@layer utilities {
+  .font-sans-title {
+    font-family: var(--font-sans);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+  }
+  .font-sans-subtitle {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+  .font-sans-body {
+    font-family: var(--font-sans);
+    font-weight: 400;
+  }
+
+  .font-label-md {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 18px;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .font-label-sm {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 16px;
+    letter-spacing: 0.05em;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .font-code-md {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 400;
+  }
+
+  .block-shadow {
+    box-shadow: 4px 4px 0px var(--color-ink);
+  }
+}
+
+.material-symbols-outlined {
+  font-variation-settings:
+    'FILL' 0,
+    'wght' 400,
+    'GRAD' 0,
+    'opsz' 24;
+}
+
+.tremble {
+  animation: tremble 0.5s linear infinite;
+  display: inline-block;
+}
+
+@keyframes tremble {
+  0% {
+    transform: translate(0.5px, 0.5px);
+  }
+  25% {
+    transform: translate(-0.5px, 0.5px);
+  }
+  50% {
+    transform: translate(-0.5px, -0.5px);
+  }
+  75% {
+    transform: translate(0.5px, -0.5px);
+  }
+  100% {
+    transform: translate(0.5px, 0.5px);
+  }
+}
+
+.ekg-pulse {
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  animation: dash 3s linear infinite;
+}
+
+@keyframes dash {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 12px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f4f1ea;
+  border-left: 2px solid #111111;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #111111;
+  border: 2px solid #f4f1ea;
+}
+
+.fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

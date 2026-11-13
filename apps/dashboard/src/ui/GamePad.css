@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  /* OSR Aesthetic - No rounded corners, strictly analog feel */
+  * {
+    border-radius: 0 !important;
+  }
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #131315;
+    font-family: 'Inter', sans-serif;
+    color: #e5e1e4;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #353437;
+    border-radius: 0;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #544434;
+  }
+}
+
+@layer utilities {
+  .grid-layout {
+    display: grid;
+    grid-template-columns: 16rem 1fr 20rem;
+    grid-template-rows: 240px 1fr;
+    height: calc(100vh - 3rem);
+    margin-top: 3rem;
+  }
+
+  .ghost-border {
+    border: 1px solid rgba(84, 68, 52, 0.15);
+  }
+  .display-lg {
+    font-size: 3.5rem;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .label-sm {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  .amber-glow {
+    box-shadow: 0px 0px 12px rgba(255, 159, 28, 0.2);
+  }
+
+  /* Specific positioning for the Eye Anchor */
+  .eye-anchor {
+    grid-column: 1 / 2;
+    grid-row: 1 / 2;
+    border-bottom: 1px solid rgba(255, 159, 28, 0.1);
+  }
+  .matrix-container {
+    grid-column: 1 / 2;
+    grid-row: 2 / 3;
+  }
+  .trace-container {
+    grid-column: 2 / 3;
+    grid-row: 1 / 3; /* Spans both rows to maintain center prominence */
+  }
+  .ledger-container {
+    grid-column: 3 / 4;
+    grid-row: 1 / 3; /* Spans both rows */
+  }
+
+  .scanline {
+    background: linear-gradient(to bottom, rgba(239, 211, 52, 0.05) 50%, rgba(0, 0, 0, 0.1) 50%);
+    background-size: 100% 4px;
+    pointer-events: none;
+  }
+
+  .reptile-pattern {
+    background-color: #1a2416;
+    background-image: radial-gradient(circle at 100% 150%, #1a2416 24%, #4a1d4d 25%, #4a1d4d 28%, #1a2416 29%, #1a2416 36%, #4a1d4d 36%, #4a1d4d 40%, transparent 40%), radial-gradient(circle at 0 150%, #1a2416 24%, #4a1d4d 25%, #4a1d4d 28%, #1a2416 29%, #1a2416 36%, #4a1d4d 36%, #4a1d4d 40%, transparent 40%), radial-gradient(circle at 50% 100%, #4a1d4d 10%, #1a2416 11%, #1a2416 23%, #4a1d4d 24%, #4a1d4d 30%, #1a2416 31%, #1a2416 43%, #4a1d4d 44%, #4a1d4d 50%, transparent 50%), radial-gradient(circle at 100% 50%, #4a1d4d 5%, #1a2416 6%, #1a2416 15%, #4a1d4d 16%, #4a1d4d 20%, #1a2416 21%, #1a2416 30%, #4a1d4d 31%, #4a1d4d 35%, #1a2416 36%, #1a2416 45%, #4a1d4d 46%, #4a1d4d 49%, transparent 50%), radial-gradient(circle at 0 50%, #4a1d4d 5%, #1a2416 6%, #1a2416 15%, #4a1d4d 16%, #4a1d4d 20%, #1a2416 21%, #1a2416 30%, #4a1d4d 31%, #4a1d4d 35%, #1a2416 36%, #1a2416 45%, #4a1d4d 46%, #4a1d4d 49%, transparent 50%);
+    background-size: 20px 10px;
+    background-attachment: fixed;
+    opacity: 0.95;
+  }
+}

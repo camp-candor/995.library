@@ -1,0 +1,149 @@
+import { ApplicationModel } from '../application.model.js';
+import ApplicationBit from '../fce/application.bit.js';
+import State from '../../99.core/state.js';
+import StageBit from '../fce/stage.bit.js';
+
+import { Application, Assets, Container, Sprite } from 'pixi.js';
+
+import * as ActCol from '../../97.collect.unit/collect.action.js';
+import * as ActApp from '../application.action.js';
+import * as ActCan from '../../03.container.unit/container.action.js';
+import * as ActGph from '../../04.graphic.unit/graphic.action.js';
+import * as ActTxt from '../../05.text.unit/text.action.js';
+import * as ActSpr from '../../06.sprite.unit/sprite.action.js';
+
+var bit, val, idx, dex, lst, dat;
+
+var testing = false;
+
+export const initApplication = (cpy: ApplicationModel, bal: ApplicationBit, ste: State) => {
+  return cpy;
+};
+
+export const createApplication = async (cpy: ApplicationModel, bal: ApplicationBit, ste: State) => {
+  if (bal.dat == null) bal.dat = {};
+
+  if (bal.dat.src == null) bal.dat.src = 'indexCanvas';
+
+  var dat: StageBit = { idx: bal.idx, src: bal.dat.src, bit: null };
+  dat.bit = new Application();
+
+  bal.slv({ appBit: { idx: 'create-application', dat: { bit: dat.bit } } });
+
+  return cpy;
+};
+
+export const updateApplication = async (cpy: ApplicationModel, bal: ApplicationBit, ste: State) => {
+  var idx = bal.idx;
+
+  bit = await ste.hunt(ActApp.READ_APPLICATION, { idx: bal.idx });
+  dat = bit.appBit.dat;
+
+  var app = dat.bit;
+
+  if (app == null) return bal.slv({ appBit: { idx: 'error-update-application' } });
+
+  //app.renderer.resize(dat.width, dat.height);
+
+  return cpy;
+};
+
+export const readApplication = async (cpy: ApplicationModel, bal: ApplicationBit, ste: State) => {
+  var slv = bal.slv;
+  if (bal.idx == null) bal.idx = 'app00';
+  bit = await ste.hunt(ActCol.READ_COLLECT, { idx: bal.idx, bit: ActApp.CREATE_APPLICATION });
+  if (slv != null) slv({ appBit: { idx: 'read-application', dat: bit.clcBit.dat } });
+  return cpy;
+};
+export const writeApplication = async (cpy: ApplicationModel, bal: ApplicationBit, ste: State) => {
+  bit = await ste.hunt(ActCol.WRITE_COLLECT, { idx: bal.idx, dat: bal.dat, bit: ActApp.CREATE_APPLICATION });
+  ste.hunt(ActApp.UPDATE_APPLICATION, { idx: bal.idx });
+
+  if (bal.slv != null) bal.slv({ appBit: { idx: 'write-application', dat: bit.clcBit.dat } });
+
+  return cpy;
+};
+
+export const removeApplication = async (cpy: ApplicationModel, bal: ApplicationBit, ste: State) => {
+  if (typeof window != 'object') return bal.slv({ appBit: { idx: 'error-create-visage', dat: {} } });
+
+  //gotcha-- making sure that the src is present on the collect bale once caused a tremendous issue
+  bit = await ste.hunt(ActCol.REMOVE_COLLECT, { idx: bal.idx, src: bal.src, dat: bal.dat, bit: ActApp.DELETE_APPLICATION });
+
+  if (bal.slv != null) bal.slv({ appBit: { idx: 'remove-application', dat: bit.clcBit } });
+
+  return cpy;
+};
+
+export const deleteApplication = async (cpy: ApplicationModel, bal: ApplicationBit, ste: State) => {
+  bit = await ste.hunt(ActApp.READ_APPLICATION, { idx: bal.idx });
+  dat = bit.appBit.dat;
+
+  var app = dat.bit;
+  app.destroy();
+
+  if (bal.slv != null) return bal.slv({ appBit: { idx: 'delete-application', dat } });
+
+  return cpy;
+};
+
+export const dimensionApplication = async (cpy: ApplicationModel, bal: ApplicationBit, ste: State) => {
+  var idx = bal.idx;
+  bit = await ste.hunt(ActApp.READ_APPLICATION, { idx: bal.idx });
+
+  if (bal.slv != null) return bal.slv({ appBit: { idx: 'dimension-application', dat: bal.dat } });
+
+  return cpy;
+};
+
+export const extractApplication = async (cpy: ApplicationModel, bal: ApplicationBit, ste: State) => {
+  var idx = bal.idx;
+  bit = await ste.hunt(ActApp.READ_APPLICATION, { idx });
+
+  dat = bit.appBit.dat;
+
+  var app = dat.bit;
+  var canvas = app.renderer.plugins.extract.canvas();
+  const context = canvas.getContext('2d');
+  const imgData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+  if (bal.slv != null) return bal.slv({ appBit: { idx: 'extract-application', dat: imgData } });
+
+  return cpy;
+};
+
+export const listApplication = async (cpy: ApplicationModel, bal: ApplicationBit, ste: State) => {
+  dat = null;
+
+  bit = await ste.hunt(ActCol.FETCH_COLLECT, { val: 0, bit: ActApp.CREATE_APPLICATION });
+
+  if (bit.clcBit.dat == null) lst = [];
+  else dat = bit.clcBit.dat;
+
+  dat;
+
+  if (dat != null) {
+    lst = [];
+
+    dat.bitList.forEach((a) => {
+      lst.push(a.idx);
+    });
+  }
+
+  lst;
+
+  //process.chdir("../002.space")
+
+  //src = cpy.hexmapLoc
+  //bit = await ste.bus(ActDsk.LIST_DISK, { idx: null, src })
+
+  //lst = bit.dskBit.lst
+
+  //if (bal.idx != null) process.chdir(bal.idx)
+
+  //var dex = lst.length()
+
+  bal.slv({ appBit: { idx: 'list-application', lst } });
+
+  return cpy;
+};
