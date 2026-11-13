@@ -152,6 +152,11 @@ check_staged_filenames() {
     return 1
 }
 
+check_dashboard_structure() {
+    repo_root="$(get_repo_root)"
+    node "$repo_root/scripts/check-dashboard-structure.mjs" --staged
+}
+
 run_sync_package_lock_if_needed() {
     staged_packages="$(
         git diff --cached --name-only \
@@ -217,6 +222,7 @@ print_usage() {
         '  check_protected_branch <commit|push>' \
         '  validate_branch_name' \
         '  check_staged_filenames' \
+        '  check_dashboard_structure' \
         '  run_sync_package_lock_if_needed' \
         '  run_lint_staged_if_needed'
 }
@@ -253,7 +259,7 @@ run_git_hook_function() {
             fi
             check_protected_branch "$1"
             ;;
-        validate_branch_name | check_staged_filenames | run_sync_package_lock_if_needed | run_lint_staged_if_needed | show_completed_commit)
+        validate_branch_name | check_staged_filenames | check_dashboard_structure | run_sync_package_lock_if_needed | run_lint_staged_if_needed | show_completed_commit)
             if [ "$#" -ne 0 ]; then
                 print_usage
                 return 2
