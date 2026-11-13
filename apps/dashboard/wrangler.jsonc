@@ -1,0 +1,14 @@
+{
+    "$schema": "node_modules/wrangler/config-schema.json",
+    "name": "995-library-dashboard-control",
+    "compatibility_date": "2024-12-01",
+    "compatibility_flags": ["nodejs_compat"],
+    "main": "./worker.js",
+    "assets": {
+        "binding": "ASSETS",
+        "directory": "./dist",
+        "not_found_handling": "single-page-application"
+    },
+    "workers_dev": true
+}
+

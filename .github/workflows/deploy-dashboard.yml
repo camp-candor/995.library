@@ -1,17 +1,15 @@
-name: Deploy Dashboard to Cloudflare Pages
+name: Deploy Dashboard to Cloudflare Workers
 
-# Ported from 002.react-control/.github/workflows/deploy-pages.yml and adapted
-# to the 995.library monorepo layout (app lives at apps/dashboard).
-# Publishes the React dashboard (static dist + Pages Functions) to Cloudflare.
+# Publishes the React dashboard (static dist + Worker API routes) to
+# Cloudflare Workers with Static Assets, modeled on
+# 000.series-dashboard/.github/workflows/deploy-cf.yml.
 #
 # Required repository secrets:
-#   CLOUDFLARE_API_TOKEN  - Cloudflare API token with Pages write access
+#   CLOUDFLARE_API_TOKEN  - Cloudflare API token with Workers Scripts:Edit access
 #   CLOUDFLARE_ACCOUNT_ID - Cloudflare account ID
 #   PUBLIC_SERVER_URL     - public WebSocket URL baked into the bundle as
 #                           process.env.PUBLIC_WS_URL (kept under the original
 #                           secret name so existing configuration keeps working)
-#
-# The target Pages project must already exist in the Cloudflare dashboard.
 
 on:
     push:
@@ -64,23 +62,16 @@ jobs:
               run: npm run build --workspace=@camp_candor/shared --workspace=@camp_candor/types
 
             # STEP 2: Build the React app (RSBuild).
-            # Generates apps/dashboard/dist plus Pages Functions from
-            # apps/dashboard/functions.
+            # Generates apps/dashboard/dist for Worker static assets.
             - name: Build Dashboard
               run: npm run build --workspace=@camp_candor/dashboard
               env:
                   PUBLIC_WS_URL: ${{ secrets.PUBLIC_SERVER_URL }}
 
-            # STEP 3: Upload to Cloudflare Pages.
-            # You MUST create the project in the Cloudflare dashboard first.
-            - name: Deploy to Cloudflare Pages
-              id: pages_deploy
-              uses: cloudflare/wrangler-action@v3
-              with:
-                  apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-                  accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-                  gitHubToken: ${{ secrets.GITHUB_TOKEN }}
-                  workingDirectory: 'apps/dashboard'
-                  # Upload dist to the Pages project (functions/ is picked up
-                  # automatically from the project root).
-                  command: pages deploy dist --project-name=002-primal-mama-mobile-control
+            # STEP 3: Deploy to Cloudflare Workers via wrangler.jsonc.
+            - name: Deploy to Cloudflare Workers
+              working-directory: apps/dashboard
+              run: npx --yes wrangler deploy
+              env:
+                  CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+                  CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
