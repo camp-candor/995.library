@@ -153,30 +153,15 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         if ((bal as any)?.slv) (bal as any).slv({ mnuBit: { idx: 'update-menu-headless', lst: ['LIBRARY MENU'] } })
         return cpy
     }
-    lst = [
-        'LIBRARY MENU',
-        ...Array.from(cpy.menuRoutes.keys()),
-        'DISCOVER FLEET PIVOTS',
-        'LIST SWITCHBOARD ROUTES',
-        'VERIFY SESSION ROUTES',
-        'JUMP TO MOUNTED PIVOT',
-        'TOGGLE HUD TELEMETRY',
-        'WORKER BRIDGE STATUS',
-    ]
+    const coreMenus = ['LIBRARY MENU', 'PIVOT MENU', 'SHADE MENU']
+    const allRoutes = Array.from(cpy.menuRoutes.keys())
+    const siblingRoutes = allRoutes.filter((r) => !coreMenus.includes(r))
+    const trailingCoreRoutes = ['PIVOT MENU', 'SHADE MENU'].filter((r) =>
+        cpy.menuRoutes.has(r),
+    )
+    lst = [...siblingRoutes, 'LIBRARY MENU', ...trailingCoreRoutes]
     const descriptions: Record<string, string> = {
         'LIBRARY MENU': 'Open the library menu\nto explore library features.',
-        'DISCOVER FLEET PIVOTS':
-            '-Discover local sibling pivots\nand hydrate hunt buses.',
-        'LIST SWITCHBOARD ROUTES':
-            '-List registered master root\nswitchboard routes.',
-        'VERIFY SESSION ROUTES':
-            '-Verify session route readiness\ntable in cns00.',
-        'JUMP TO MOUNTED PIVOT':
-            '-Jump directly to a mounted\npivot session.',
-        'TOGGLE HUD TELEMETRY':
-            '-Toggle HUD telemetry banner\nvisibility.',
-        'WORKER BRIDGE STATUS':
-            '-Inspect remote worker bridge\nparity status.',
     }
 
     const gridBit = await ste.hunt(ActGrd.UPDATE_GRID, {
@@ -227,110 +212,6 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
                     src: '>> [RETURN] Restored Master Root Switchboard.',
                 })
             } catch {}
-            break
-        }
-
-        case 'DISCOVER FLEET PIVOTS': {
-            shouldReloop = true
-            await ste.hunt('[Library action] Discover Fleet Pivots', {
-                registerMenus: true,
-            })
-            break
-        }
-
-        case 'LIST SWITCHBOARD ROUTES': {
-            shouldReloop = true
-            await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: '>> [SWITCHBOARD] Registered Master Root Routes:',
-            })
-            for (const title of [
-                'LIBRARY MENU',
-                ...Array.from((cpy as any).menuRoutes?.keys?.() || []),
-            ]) {
-                const desc =
-                    (cpy as any).menuRouteDescriptions?.get?.(title) ||
-                    'No description'
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: `:: [${title}] -> ${String(desc).replace(/\s+/g, ' ')}`,
-                })
-            }
-            break
-        }
-
-        case 'VERIFY SESSION ROUTES': {
-            shouldReloop = true
-            const { buildSessionRouteAuditTable } = require('./menu.audit') as any
-            let lines: string[] = []
-            try {
-                const res = buildSessionRouteAuditTable((cpy as any).menuRoutes)
-                lines = res.asciiLines
-            } catch {
-                lines = [
-                    '>> +--------------------------+',
-                    '>> | ROUTE AUDIT UNAVAILABLE |',
-                    '>> +--------------------------+',
-                ]
-            }
-            await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: '>> [AUDIT] Local Session Route Readiness Table:',
-            })
-            for (const line of lines) {
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: line,
-                })
-            }
-            break
-        }
-
-        case 'JUMP TO MOUNTED PIVOT': {
-            shouldReloop = true
-            const externalTargets = Array.from(
-                (cpy as any).menuRoutes?.keys?.() || [],
-            )
-            if (externalTargets.length === 0) {
-                await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                    idx: 'cns00',
-                    src: ':: [WARN] No external pivots mounted to jump into.',
-                })
-                break
-            }
-            await ste.hunt(ActTrm.CLEAR_TERMINAL, {})
-            const jumpChoice = await ste.hunt(ActChc.OPEN_CHOICE, {
-                dat: { clr0: Color.BLACK, clr1: Color.GREEN },
-                src: Align.VERTICAL,
-                lst: [...externalTargets, 'CANCEL'],
-                net: gridBit?.grdBit?.dat,
-            })
-            const target = jumpChoice?.chcBit?.src || 'CANCEL'
-            if (target !== 'CANCEL') {
-                await ste.hunt(ActMnu.JUMP_PIVOT, { targetMenuTitle: target })
-            }
-            break
-        }
-
-        case 'TOGGLE HUD TELEMETRY': {
-            shouldReloop = true
-            const nextVisible = !(cpy as any).hudTelemetryVisible
-            ;(cpy as any).hudTelemetryVisible = nextVisible
-            await ste.hunt('[Terminal action] Set Session Context', {
-                activePivotTitle:
-                    (cpy as any).activeSessionTitle || 'MASTER SWITCHBOARD',
-                hudVisible: nextVisible,
-            })
-            await ste.hunt(ActCns.UPDATE_CONSOLE, {
-                idx: 'cns00',
-                src: `>> [HUD] Telemetry banner visibility set to: ${nextVisible ? 'VISIBLE' : 'HIDDEN'}`,
-            })
-            break
-        }
-
-        case 'WORKER BRIDGE STATUS': {
-            shouldReloop = true
-            await ste.hunt('[Library action] Check Worker Bridge', {})
             break
         }
 

@@ -73,10 +73,16 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         ActOlm.UPDATE_PIVOT.split(']')[1],
         ActOlm.TEST_PIVOT.split(']')[1],
         ActOlm.LIST_PIVOT.split(']')[1],
+        'DISCOVER FLEET PIVOTS',
+        'LIST SWITCHBOARD ROUTES',
+        'VERIFY SESSION ROUTES',
+        'JUMP TO MOUNTED PIVOT',
+        'TOGGLE HUD TELEMETRY',
+        'WORKER BRIDGE STATUS',
         'ROOT MENU',
     ]
 
-    bit = await global.LIBRARY.hunt(UPDATE_GRID, {
+    const gridBit = await global.LIBRARY.hunt(UPDATE_GRID, {
         x: 0,
         y: 4,
         xSpan: 4,
@@ -95,10 +101,11 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
         },
         src: Align.VERTICAL,
         lst,
-        net: bit.grdBit.dat,
+        net: gridBit.grdBit.dat,
     })
 
     src = bit.chcBit.src
+    const libMenuState = (global.LIBRARY as any)?.state?.value?.menu
 
     switch (src) {
         case ActOlm.UPDATE_PIVOT.split(']')[1]:
@@ -140,7 +147,119 @@ export const updateMenu = async (cpy: MenuModel, bal: MenuBit, ste: State) => {
             await new Promise((resolve) => setTimeout(resolve, 3000))
             break
 
+        case 'DISCOVER FLEET PIVOTS':
+            await global.LIBRARY.hunt(
+                '[Library action] Discover Fleet Pivots',
+                {
+                    registerMenus: true,
+                },
+            )
+            break
+
+        case 'LIST SWITCHBOARD ROUTES': {
+            await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [SWITCHBOARD] Registered Master Root Routes:',
+            })
+            const routes: string[] = [
+                'LIBRARY MENU',
+                ...(Array.from(
+                    libMenuState?.menuRoutes?.keys?.() || [],
+                ) as string[]),
+            ]
+            for (const title of routes) {
+                const desc =
+                    libMenuState?.menuRouteDescriptions?.get?.(title) ||
+                    'No description'
+                await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `:: [${title}] -> ${String(desc).replace(/\s+/g, ' ')}`,
+                })
+            }
+            break
+        }
+
+        case 'VERIFY SESSION ROUTES': {
+            await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> [AUDIT] Local Session Route Readiness Table:',
+            })
+            const routeKeys: string[] = [
+                'LIBRARY MENU',
+                ...(Array.from(
+                    libMenuState?.menuRoutes?.keys?.() || [],
+                ) as string[]),
+            ]
+            await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> +--------------------------+----------+',
+            })
+            for (const title of routeKeys) {
+                const padded = title.slice(0, 24).padEnd(24, ' ')
+                await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: `>> | ${padded} | READY    |`,
+                })
+            }
+            await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: '>> +--------------------------+----------+',
+            })
+            break
+        }
+
+        case 'JUMP TO MOUNTED PIVOT': {
+            const externalTargets: string[] = Array.from(
+                libMenuState?.menuRoutes?.keys?.() || [],
+            )
+            if (externalTargets.length === 0) {
+                await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                    idx: 'cns00',
+                    src: ':: [WARN] No external pivots mounted to jump into.',
+                })
+                break
+            }
+            await global.LIBRARY.hunt('[Layout action] Clear Terminal', {})
+            const jumpChoice = await global.LIBRARY.hunt(OPEN_CHOICE, {
+                dat: { clr0: Color.BLACK, clr1: Color.GREEN },
+                src: Align.VERTICAL,
+                lst: [...externalTargets, 'CANCEL'],
+                net: gridBit.grdBit.dat,
+            })
+            const target = jumpChoice?.chcBit?.src || 'CANCEL'
+            if (target !== 'CANCEL') {
+                await global.LIBRARY.hunt('[Menu action] Jump Pivot', {
+                    targetMenuTitle: target,
+                })
+                if (rootSlv != null) rootSlv({ mnuBit: { idx: 'root-menu' } })
+                return cpy
+            }
+            break
+        }
+
+        case 'TOGGLE HUD TELEMETRY': {
+            const nextVisible = !(libMenuState?.hudTelemetryVisible ?? true)
+            if (libMenuState) libMenuState.hudTelemetryVisible = nextVisible
+            await global.LIBRARY.hunt('[Terminal action] Set Session Context', {
+                activePivotTitle: 'PIVOT MENU',
+                hudVisible: nextVisible,
+            })
+            await global.LIBRARY.hunt(UPDATE_CONSOLE, {
+                idx: 'cns00',
+                src: `>> [HUD] Telemetry banner visibility set to: ${nextVisible ? 'VISIBLE' : 'HIDDEN'}`,
+            })
+            break
+        }
+
+        case 'WORKER BRIDGE STATUS':
+            await global.LIBRARY.hunt(
+                '[Library action] Check Worker Bridge',
+                {},
+            )
+            break
+
         case 'ROOT MENU':
+            await global.LIBRARY.hunt('[Layout action] Clear Terminal', {})
             if (rootSlv != null) rootSlv({ mnuBit: { idx: 'root-menu' } })
             return cpy
 

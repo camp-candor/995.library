@@ -87,7 +87,8 @@ export const resolveFleetRoot = async (
           entry.isDirectory() &&
           /^\d{3}\./.test(entry.name) &&
           !isTombstonedDirectory(path.join(currentDir, entry.name)) &&
-          fs.existsSync(path.join(currentDir, entry.name, 'packages'))
+          (fs.existsSync(path.join(currentDir, entry.name, 'apps', '995.library', 'run.ts')) ||
+            fs.existsSync(path.join(currentDir, entry.name, 'packages')))
         ) {
           siblingRepoCount += 1;
         }
@@ -141,7 +142,10 @@ export const scanFleetPivots = async (
     { clusterLabel: 'local', packagesParent: path.join(process.cwd(), 'packages') },
   ];
 
+  const discoveredMap = new Map<string, DiscoveredPivotBit>();
+
   if (!cpy.isStandaloneMode && cpy.fleetRoot) {
+    // 1. Classic multi-cluster paths (camp-candor-cauldron, 00.governance..05.delivery)
     candidateRoots.push({
       clusterLabel: 'front-porch',
       packagesParent: path.join(cpy.fleetRoot, 'camp-candor-cauldron', 'packages'),
@@ -178,20 +182,41 @@ export const scanFleetPivots = async (
       }
     }
 
-    // Also scan flat sibling repositories directly under fleetRoot (e.g. 000.camp-candor-cauldron, 000.goblin-lore)
+    // 2. Sibling repository cockpits directly under fleetRoot (e.g. 000.goblin-lore/apps/995.library/run.ts)
     try {
-      const topEntries = fs.readdirSync(cpy.fleetRoot, { withFileTypes: true });
+      const topEntries = fs
+        .readdirSync(cpy.fleetRoot, { withFileTypes: true })
+        .sort((a, b) => a.name.localeCompare(b.name));
       for (const topEntry of topEntries) {
         if (!topEntry.isDirectory()) continue;
-        if (topEntry.name.startsWith('.') || topEntry.name === 'node_modules') continue;
-        if ((CLUSTER_MARKERS as readonly string[]).includes(topEntry.name)) continue;
+        if (!/^\d{3}\./.test(topEntry.name)) continue;
+        if (topEntry.name === '995.library') continue;
         const repoPath = path.join(cpy.fleetRoot, topEntry.name);
         if (isTombstonedDirectory(repoPath)) continue;
-        const pkgsDir = path.join(repoPath, 'packages');
-        if (fs.existsSync(pkgsDir)) {
-          candidateRoots.push({
+
+        const runnerTs = path.join(repoPath, 'apps', '995.library', 'run.ts');
+        const runnerJs = path.join(repoPath, 'apps', '995.library', 'run.js');
+        const runEntry = fs.existsSync(runnerTs)
+          ? runnerTs
+          : fs.existsSync(runnerJs)
+            ? runnerJs
+            : null;
+        if (!runEntry) continue;
+
+        const slug = topEntry.name.replace(/^\d{3}\./, '');
+        const menuTitle = slug.replace(/[-_]+/g, ' ').toUpperCase();
+        const globalKey = slug.replace(/[^a-zA-Z0-9]+/g, '_').toUpperCase();
+        if (!discoveredMap.has(globalKey)) {
+          discoveredMap.set(globalKey, {
+            packageName: topEntry.name,
+            packageDir: repoPath,
             clusterLabel: topEntry.name,
-            packagesParent: pkgsDir,
+            huntEntryPath: runEntry,
+            terminal: {
+              globalKey,
+              menuTitle,
+              menuDesc: `Launch ${topEntry.name} cockpit\n(${runEntry})`,
+            },
           });
         }
       }
@@ -199,8 +224,6 @@ export const scanFleetPivots = async (
       // ignore unreadable fleetRoot
     }
   }
-
-  const discoveredMap = new Map<string, DiscoveredPivotBit>();
 
   for (const candidate of candidateRoots) {
     if (!fs.existsSync(candidate.packagesParent)) continue;
@@ -214,6 +237,9 @@ export const scanFleetPivots = async (
 
     for (const pkgEntry of pkgEntries) {
       if (!pkgEntry.isDirectory()) continue;
+      if (candidate.clusterLabel === 'local' && (globalThis as any).PIVOTS?.[pkgEntry.name]) {
+        continue;
+      }
       const pkgDir = path.join(candidate.packagesParent, pkgEntry.name);
       if (isTombstonedDirectory(pkgDir)) continue;
 
@@ -223,23 +249,8 @@ export const scanFleetPivots = async (
       try {
         const raw = fs.readFileSync(pkgJsonPath, 'utf8');
         const pkgJson = JSON.parse(raw);
-        let terminalConfig = parseTerminalConfig(pkgJson);
-        if (!terminalConfig) {
-          const hasMenuUnit =
-            fs.existsSync(path.join(pkgDir, '98.menu.unit', 'menu.action.ts')) ||
-            fs.existsSync(path.join(candidate.packagesParent, 'dist', pkgEntry.name, '98.menu.unit', 'menu.action.js'));
-          if (!hasMenuUnit) continue;
-          const domain = pkgEntry.name.includes('.')
-            ? pkgEntry.name.split('.').slice(1).join('.')
-            : pkgEntry.name;
-          const upper = domain.toUpperCase();
-          if (upper === 'PIVOT' || upper === 'LIBRARY') continue;
-          terminalConfig = {
-            globalKey: upper,
-            menuTitle: `${upper} MENU`,
-            menuDesc: `Open the ${domain} menu\nto manage ${domain}.`,
-          };
-        }
+        const terminalConfig = parseTerminalConfig(pkgJson);
+        if (!terminalConfig) continue;
         if (terminalConfig.globalKey === 'LIBRARY') continue;
 
         const sharedDistHunt = path.join(candidate.packagesParent, 'dist', pkgEntry.name, 'hunt.js');
@@ -313,6 +324,111 @@ export const hydratePivotModules = async (
         ste,
         `:: [SKIP] ${pivot.terminal.menuTitle} (${pivot.packageName}) -> hunt.js not compiled`
       );
+      continue;
+    }
+
+    const isRunnerBridge =
+      /[\\/]apps[\\/]995\.library[\\/]run\.(ts|js)$/i.test(pivot.huntEntryPath);
+
+    if (isRunnerBridge) {
+      const runnerInstance = {
+        globalKey: pivot.terminal.globalKey,
+        menuTitle: pivot.terminal.menuTitle,
+        menuDesc: pivot.terminal.menuDesc,
+        repoDir: pivot.packageDir,
+        runEntryPath: pivot.huntEntryPath,
+        hunt: async (actionType: string, actionBal: any = {}) => {
+          if (actionType === '[Menu action] Init Menu') {
+            const trmState = (g.LIBRARY as any)?.state?.value?.terminal;
+            const screen = trmState?.screen;
+            const program = screen?.program;
+            const isInteractive = Boolean(screen && program && process.stdin.isTTY);
+
+            if (!isInteractive) {
+              emitConsoleLine(
+                ste,
+                `>> [RUNNER:HEADLESS] ${pivot.terminal.menuTitle} -> ${pivot.huntEntryPath}`
+              );
+              if (typeof actionBal?.slv === 'function') {
+                actionBal.slv({
+                  mnuBit: { idx: 'runner-headless', src: pivot.huntEntryPath },
+                });
+              }
+              return { ok: true, headless: true, runEntryPath: pivot.huntEntryPath };
+            }
+
+            let resumeFn: (() => void) | null = null;
+            try {
+              if (typeof program.pause === 'function') {
+                resumeFn = program.pause();
+              } else if (typeof screen.leave === 'function') {
+                screen.leave();
+              }
+
+              const { spawnSync } = require('node:child_process');
+              if (pivot.huntEntryPath.endsWith('.ts')) {
+                const tsxCli = require.resolve('tsx/cli');
+                spawnSync(process.execPath, [tsxCli, pivot.huntEntryPath], {
+                  cwd: pivot.packageDir,
+                  stdio: 'inherit',
+                });
+              } else {
+                spawnSync(process.execPath, [pivot.huntEntryPath], {
+                  cwd: pivot.packageDir,
+                  stdio: 'inherit',
+                });
+              }
+            } finally {
+              if (resumeFn) {
+                resumeFn();
+              } else if (typeof screen.enter === 'function') {
+                screen.enter();
+              }
+              try {
+                if (typeof screen.alloc === 'function') screen.alloc();
+                if (typeof screen.realloc === 'function') screen.realloc();
+                if (typeof screen.render === 'function') screen.render();
+              } catch {
+                // ignore screen restore errors
+              }
+            }
+
+            if (typeof actionBal?.slv === 'function') {
+              actionBal.slv({
+                mnuBit: { idx: 'runner-return', src: pivot.huntEntryPath },
+              });
+            }
+            return { ok: true, runEntryPath: pivot.huntEntryPath };
+          }
+          if (typeof actionBal?.slv === 'function') {
+            actionBal.slv({ ok: true });
+          }
+          return { ok: true };
+        },
+      };
+
+      g[pivot.terminal.globalKey] = runnerInstance;
+      g.PIVOTS[pivot.packageName] = runnerInstance;
+
+      const receipt: PivotHydrationReceipt = {
+        globalKey: pivot.terminal.globalKey,
+        menuTitle: pivot.terminal.menuTitle,
+        packageName: pivot.packageName,
+        status: 'HYDRATED',
+      };
+      receipts.push(receipt);
+      emitConsoleLine(
+        ste,
+        `:: [OK] Mounted ${pivot.terminal.menuTitle} -> ${pivot.huntEntryPath}`
+      );
+
+      if (bal.registerMenus !== false && ste && typeof ste.hunt === 'function') {
+        await ste.hunt('[Route action] Route Menu', {
+          menuTitle: pivot.terminal.menuTitle,
+          menuDesc: pivot.terminal.menuDesc,
+          globalKey: pivot.terminal.globalKey,
+        });
+      }
       continue;
     }
 
