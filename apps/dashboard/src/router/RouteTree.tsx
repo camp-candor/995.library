@@ -8,6 +8,7 @@ import GraphicsPage from '../page/005.graphics-page/page';
 
 import CanvasPage from '../page/006.canvas-page/page';
 import GamepadPage from '../page/007.gamepad/page';
+import TerminalPage from '../page/008.terminal/page';
 
 import Play002Page from '../template/play-002/index';
 
@@ -42,6 +43,14 @@ const gamepadRoute = createRoute({
   path: '/gamepad',
   component: function Index() {
     return <GamepadPage />;
+  },
+});
+
+const terminalRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/terminal',
+  component: function Index() {
+    return <TerminalPage />;
   },
 });
 
@@ -106,6 +115,7 @@ export const RouteTree = () => {
     play002Route,
     canvasRoute,
     gamepadRoute,
+    terminalRoute,
     // titleRoute,
     // testRoute,
     // ... add your other routes back here
