@@ -1,6 +1,6 @@
 {
     "name": "@camp_candor/switchboard-worker",
-    "version": "0.5.0",
+    "version": "0.7.0",
     "private": true,
     "type": "module",
     "description": "Cloudflare Worker remote switchboard adapter for 995.library",
